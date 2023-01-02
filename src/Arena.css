@@ -1,0 +1,92 @@
+.Arena {}
+
+.modeControls {
+  margin: 20px 60px;
+}
+
+.modeControls ul {
+  list-style-type: none;
+}
+
+.Arena-wrapper {
+  width: 800px;
+  height: 400px;
+  margin: 20px 60px;
+  border: 1px solid blue;
+}
+
+.Arena-internal {
+  width: 800px;
+  height: 400px;
+  position: relative;
+}
+
+.Arena-background {
+  width: 800px;
+  height: 400px;
+  position: absolute;
+  top: 0px;
+  left: 0px;
+}
+
+.Arena-canvas {
+  width: 800px;
+  height: 400px;
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  background-color: rgba(255, 0, 0, .1);
+}
+
+.Arena-switch_row {
+  align-items: center;
+}
+
+.Arena-switch_label {
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+input[type="checkbox"].Arena-switch {
+  font-size: 12px;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 3.5em;
+  height: 1.5em;
+  background: #ddd;
+  border-radius: 3em;
+  position: relative;
+  cursor: pointer;
+  outline: none;
+  -webkit-transition: all .2s ease-in-out;
+  transition: all .2s ease-in-out;
+}
+
+input[type="checkbox"].Arena-switch:checked {
+  background: #0ebeff;
+}
+
+input[type="checkbox"].Arena-switch:after {
+  position: absolute;
+  content: "";
+  width: 1.5em;
+  height: 1.5em;
+  border-radius: 50%;
+  background: #fff;
+  -webkit-box-shadow: 0 0 .25em rgba(0, 0, 0, .3);
+  box-shadow: 0 0 .25em rgba(0, 0, 0, .3);
+  -webkit-transform: scale(.7);
+  transform: scale(.7);
+  left: 0;
+  -webkit-transition: all .2s ease-in-out;
+  transition: all .2s ease-in-out;
+}
+
+input[type="checkbox"].Arena-switch:checked:after {
+  left: calc(100% - 1.5em);
+}
+
+.Arena-locations ul {
+  list-style: none;
+}

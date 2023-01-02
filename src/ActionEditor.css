@@ -1,0 +1,26 @@
+.ActionEditor {
+  display: flex;
+  width: 100%;
+  font-size: 12pt;
+}
+
+.ActionEditor input[type="text"] {
+  border: 0;  
+  margin-left: 3px;
+  margin-right: 3px;
+}
+
+.ActionEditor-resources {
+  display: block;
+  margin-left: 3px;
+  margin-right: 3px;
+}
+
+.ActionEditor-resource {
+  width: 100%;
+  text-align: right;
+}
+
+.ActionEditor-resource label {
+  display: inline-block;
+}
