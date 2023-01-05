@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState, MouseEventHandler, ChangeEventHandler } from 'react';
 import arena from './arena.png';
-import { Exclusion, Position, Location } from './Game';
+import { Exclusion, Position, Location, Runnable } from './Game';
 import LocationEditor from './LocationEditor';
 import './Arena.css';
+import RunEditor from './RunEditor';
 
 export type ArenaLocations = {
   label_idx: number;
@@ -15,6 +16,7 @@ const Arena: React.FC = () => {
   const [mode, setMode] = useState<'layout' | 'measure'>('layout');
   const [locations, setLocations] = useState<ArenaLocations>({ label_idx: 0, locations: [] });
   const [exclusions, setExclusions] = useState<Array<Exclusion>>([]);
+  const [instrs, setInstrs] = useState<Array<Runnable>>([]);
 
   const [mouseDown, setMouseDown] = useState<boolean>(false);
   const [dragging, setDragging] = useState<boolean>(false);
@@ -147,6 +149,9 @@ const Arena: React.FC = () => {
             return (<li key={`location-${i}`}><LocationEditor location={loc} setLocation={(newLoc) => updateLocation(newLoc, i)} /></li>)
           })}
         </ul>
+      </div>
+      <div className='Arena-run-instructions'>
+        <RunEditor locations={locations.locations} runInstructions={instrs} setRunInstructions={(xs) => setInstrs(xs)}/>
       </div>
     </div>
   )

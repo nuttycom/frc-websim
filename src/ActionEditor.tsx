@@ -10,7 +10,7 @@ const ActionEditor: React.FC<{ action: GameAction, setAction: SetAction }> = (pr
   const [pname, setPname] = useState<string>(props.action.produces[0] ? props.action.produces[0].piece_id : "")
   const [pqty, setPQty] = useState<string>(props.action.produces[0] ? props.action.produces[0].count.toString() : "")
   const [cname, setCname] = useState<string>(props.action.consumes[0] ? props.action.consumes[0].piece_id : "")
-  const [cqty, setCQty] = useState<string>(props.action.consumes[0] ? props.action.produces[0].count.toString() : "")
+  const [cqty, setCQty] = useState<string>(props.action.consumes[0] ? props.action.consumes[0].count.toString() : "")
 
   const handleNameChange = (ev: React.ChangeEvent<HTMLInputElement>) => {
     setName(ev.target.value);
