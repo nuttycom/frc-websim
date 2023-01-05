@@ -45,7 +45,7 @@ const ActionEditor: React.FC<{ action: GameAction, setAction: SetAction }> = (pr
     const nProduced = parseInt(pqty);
     const nConsumed = parseInt(cqty);
     if (name.trim() !== "") {
-      props.setAction({
+      const action = {
         action_id: name,
         produces: pname.trim() === "" ? [] : [{
           piece_id: pname.trim(),
@@ -56,7 +56,10 @@ const ActionEditor: React.FC<{ action: GameAction, setAction: SetAction }> = (pr
           count: isNaN(nConsumed) ? 0 : nConsumed
         }],
         reward: isNaN(nReward) ? 0 : nReward
-      });
+      };
+      console.log(`Calling setAction with ${action}`);
+
+      props.setAction(action);
     }
   }, [props, name, reward, pname, pqty, cname, cqty]);
 

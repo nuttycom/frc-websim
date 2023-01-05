@@ -1,5 +1,6 @@
 .RunEditor {
   align-items: center;
+  font-size: 12pt;
 }
 
 .RunEditor ul {
@@ -14,5 +15,14 @@
 .start-select {
   display: inline-block;
   margin-left: 5px;
-  margin-right: 5px;
+}
+
+.runnable-type-select {
+  display: inline-block;
+  margin-left: 5px;
+}
+
+.move-select {
+  display: inline-block;
+  margin-left: 5px;
 }
