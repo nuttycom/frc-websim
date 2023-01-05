@@ -1,26 +1,8 @@
 import React, { useEffect, useRef, useState, MouseEventHandler, ChangeEventHandler } from 'react';
 import arena from './arena.png';
-import { GameAction } from './Game';
+import { Exclusion, Position, Location } from './Game';
 import LocationEditor from './LocationEditor';
 import './Arena.css';
-
-export type Exclusion = {
-  top_left_x: number;
-  top_left_y: number;
-  width: number;
-  height: number;
-}
-
-export type Position = {
-  x: number;
-  y: number;
-}
-
-export type Location = {
-  label: string;
-  position: Position;
-  actions: Array<GameAction>;
-};
 
 export type ArenaLocations = {
   label_idx: number;
@@ -61,8 +43,10 @@ const Arena: React.FC = () => {
     if (dragging && dragStart && dragEnd) {
       setExclusions((xs) => xs.concat([
         {
-          top_left_x: Math.min(dragStart.x, dragEnd.x),
-          top_left_y: Math.min(dragStart.y, dragEnd.y),
+          top_left: {
+            x: Math.min(dragStart.x, dragEnd.x),
+            y: Math.min(dragStart.y, dragEnd.y)
+          },
           width: Math.abs(dragStart.x - dragEnd.x),
           height: Math.abs(dragStart.y - dragEnd.y)
         }
@@ -70,7 +54,7 @@ const Arena: React.FC = () => {
       setDragging(false);
     } else {
       const loc = {
-        label: labels.charAt(locations.label_idx),
+        loc_id: labels.charAt(locations.label_idx),
         position: { x: event.clientX - rect.left, y: event.clientY - rect.top },
         actions: []
       };
@@ -112,12 +96,12 @@ const Arena: React.FC = () => {
         locations.locations.forEach((loc) => {
           ctx.font = '20px Consolas';
           ctx.fillStyle = 'black';
-          ctx.fillText(loc.label, loc.position.x - 8, loc.position.y + 5);
+          ctx.fillText(loc.loc_id, loc.position.x - 8, loc.position.y + 5);
         });
 
         exclusions.forEach((exc) => {
           ctx.fillStyle = 'rgba(255, 0, 0, 0.25';
-          ctx.fillRect(exc.top_left_x, exc.top_left_y, exc.width, exc.height);
+          ctx.fillRect(exc.top_left.x, exc.top_left.y, exc.width, exc.height);
         });
 
         if (mode === 'layout' && dragStart && dragEnd) {
@@ -160,7 +144,7 @@ const Arena: React.FC = () => {
       <div className='Arena-locations'>
         <ul>
           {locations.locations.map((loc, i) => {
-            return (<li><LocationEditor location={loc} setLocation={(newLoc) => updateLocation(newLoc, i)} /></li>)
+            return (<li key={`location-${i}`}><LocationEditor location={loc} setLocation={(newLoc) => updateLocation(newLoc, i)} /></li>)
           })}
         </ul>
       </div>

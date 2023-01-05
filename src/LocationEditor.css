@@ -3,6 +3,11 @@
   align-items: center;
 }
 
+.LocationEditor-actions {
+  display: block;
+  align-items: center;
+}
+
 .LocationEditor ul {
   list-style: none;
 }

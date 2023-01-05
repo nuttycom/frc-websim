@@ -1,7 +1,6 @@
 import React, { useState } from "react";
-import { GameAction } from "./Game";
+import { GameAction, Location } from "./Game";
 import ActionEditor from "./ActionEditor";
-import { Location } from "./Arena";
 import './LocationEditor.css';
 
 type SetLocation = (loc: Location) => void;
@@ -10,25 +9,29 @@ const LocationEditor: React.FC<{ location: Location, setLocation: SetLocation }>
   const [actions, setActions] = useState<Array<GameAction>>([]);
 
   const addGameAction = (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
-    const newAction: GameAction = { name: "", produces: [], consumes: [], reward: 0 };
+    const newAction: GameAction = { action_id: "", produces: [], consumes: [], reward: 0 };
     setActions((xs) => xs.concat(newAction))
   };
 
-  const updateAction = (act: GameAction, i: number) => {
+  const updateAction = (act: GameAction | null, i: number) => {
     setActions((cur) => {
-      cur[i] = act;
-      return cur;
+      if (act === null) {
+        return cur.filter((act, idx) => idx !== i);
+      } else {
+        cur[i] = act;
+        return cur;
+      }
     })
   };
 
   const actionElems: Array<JSX.Element> = actions.map((act, i) => {
-    return (<li key={i}><ActionEditor action={act} setAction={(newAct) => updateAction(newAct, i)} /> </li>)
+    return (<li key={`${props.location.loc_id}-actions-${i}`}><ActionEditor action={act} setAction={(newAct) => updateAction(newAct, i)} /> </li>)
   });
 
   return (
     <div className="LocationEditor">
-      <span className='loc_id'>Location {props.location.label}</span> 
-      <ul>
+      <span className='LocationEditor-loc_id'>Location {props.location.loc_id}</span>
+      <ul className='LocationEditor-actions'>
         <li>
           <button className="LocationEditor-addGameActionButton" onClick={addGameAction} type="button">
             Add Game Action At Location
