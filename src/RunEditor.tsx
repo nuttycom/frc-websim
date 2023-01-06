@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Location, Runnable, RunAlg, Act, Move, Start } from "./Game";
 import './RunEditor.css';
 
@@ -16,11 +16,15 @@ class RenderRunnable implements RunAlg<JSX.Element> {
   }
 }
 
-const RunEditor: React.FC<{ locations: Array<Location>, runInstructions: Array<Runnable>, setRunInstructions: SetRunInstructions }> = (props) => {
-  const [instrs, setInstrs] = useState<Array<Runnable>>(props.runInstructions);
+const RunEditor: React.FC<{
+  locations: Array<Location>,
+  runInstructions: Array<Runnable>,
+  setRunInstructions: SetRunInstructions
+}> = (props) => {
+  //const [instrs, setInstrs] = useState<Array<Runnable>>(props.runInstructions);
   const [runnableType, setRunnableType] = useState<string>('placeholder');
   const [lastLocation, setLastLocation] = useState<Location | undefined>(undefined);
-  
+
   // Effect Handlers
 
   const runnableTypeSelected = (event: React.ChangeEvent<HTMLSelectElement>) => {
@@ -32,28 +36,29 @@ const RunEditor: React.FC<{ locations: Array<Location>, runInstructions: Array<R
   const setStart = (event: React.ChangeEvent<HTMLSelectElement>) => {
     if (event.target.value !== 'placeholder') {
       setLastLocation(props.locations.find((loc) => loc.loc_id === event.target.value))
-      setInstrs((is) => is.concat([new Start(event.target.value)]));
+      props.setRunInstructions(props.runInstructions.concat([new Start(event.target.value)]));
+      setRunnableType('placeholder');
     }
   };
 
   const addMove = (event: React.ChangeEvent<HTMLSelectElement>) => {
     if (event.target.value !== 'placeholder') {
       setLastLocation(props.locations.find((loc) => loc.loc_id === event.target.value))
-      setInstrs((is) => is.concat([new Move(event.target.value)]));
+      props.setRunInstructions(props.runInstructions.concat([new Move(event.target.value)]));
+      setRunnableType('placeholder');
     }
   };
 
   const addAction = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    setInstrs((is) => is.concat([new Act(event.target.value)]));
+    if (event.target.value !== 'placeholder') {
+      props.setRunInstructions(props.runInstructions.concat([new Act(event.target.value)]));
+      setRunnableType('placeholder');
+    }
   };
-
-  useEffect(() => {
-    props.setRunInstructions(instrs);
-  }, [props, instrs])
 
   // Rendering Elements
 
-  const runElems: Array<JSX.Element> = instrs.map((instr, i) => {
+  const runElems: Array<JSX.Element> = props.runInstructions.map((instr, i) => {
     const renderer = new RenderRunnable();
     return (
       <li key={`runnable-${i}`}>
@@ -66,7 +71,7 @@ const RunEditor: React.FC<{ locations: Array<Location>, runInstructions: Array<R
     return (
       <select className={className} onChange={onChange}>
         <option value='placeholder'>(select one)</option>
-        {props.locations.map((loc) => <option value={loc.loc_id}>Location {loc.loc_id}</option>)}
+        {props.locations.map((loc) => <option key={`opt-loc-${loc.loc_id}`} value={loc.loc_id}>Location {loc.loc_id}</option>)}
       </select>
     );
   };
@@ -74,17 +79,16 @@ const RunEditor: React.FC<{ locations: Array<Location>, runInstructions: Array<R
   const actionSelect = () => {
     return (
       <select onChange={addAction}>
-        {lastLocation ?
-          lastLocation.actions.map(
-            (act) => <option value={act.action_id}>{act.action_id}</option>
-          ) : []
-        }
+        <option value='placeholder'>(select one)</option>
+        {(lastLocation ? lastLocation.actions : []).map((act) =>
+          <option key={`opt-act-${act.action_id}`} value={act.action_id}>{act.action_id}</option>
+        )}
       </select>
     );
   };
 
   const addRunnableControl = () => {
-    if (instrs.length === 0) {
+    if (props.runInstructions.length === 0) {
       return (
         <li key='run-control'>
           <span>Start at</span> {locationSelect('start-select', setStart)}
