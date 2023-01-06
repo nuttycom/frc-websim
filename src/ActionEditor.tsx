@@ -57,7 +57,7 @@ const ActionEditor: React.FC<{ action: GameAction, setAction: SetAction }> = (pr
         }],
         reward: isNaN(nReward) ? 0 : nReward
       };
-      console.log(`Calling setAction with ${action}`);
+      console.log(`Calling setAction with ${JSON.stringify(action)}`);
 
       props.setAction(action);
     }

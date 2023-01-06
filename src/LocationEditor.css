@@ -3,6 +3,11 @@
   align-items: center;
 }
 
+.LocationEditor-loc_id {
+  display: inline-block;
+  width: 200;
+}
+
 .LocationEditor-actions {
   display: block;
   align-items: center;

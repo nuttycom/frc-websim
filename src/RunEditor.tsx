@@ -31,14 +31,18 @@ const RunEditor: React.FC<{ locations: Array<Location>, runInstructions: Array<R
 
   const setStart = (event: React.ChangeEvent<HTMLSelectElement>) => {
     if (event.target.value !== 'placeholder') {
+      console.log(`Setting last location to loc ${event.target.value}`);
       setLastLocation(props.locations.find((loc) => loc.loc_id === event.target.value))
+      console.log(`Location is ${JSON.stringify(lastLocation)}`);
       setInstrs((is) => is.concat([new Start(event.target.value)]));
     }
   };
 
   const addMove = (event: React.ChangeEvent<HTMLSelectElement>) => {
     if (event.target.value !== 'placeholder') {
+      console.log(`Setting last location to loc ${event.target.value}`);
       setLastLocation(props.locations.find((loc) => loc.loc_id === event.target.value))
+      console.log(`Location is ${JSON.stringify(lastLocation)}`);
       setInstrs((is) => is.concat([new Move(event.target.value)]));
     }
   };
@@ -66,7 +70,7 @@ const RunEditor: React.FC<{ locations: Array<Location>, runInstructions: Array<R
     return (
       <select className={className} onChange={onChange}>
         <option value='placeholder'>(select one)</option>
-        {props.locations.map((loc) => <option value={loc.loc_id}>Location {loc.loc_id}</option>)}
+        {props.locations.map((loc) => <option key={`opt-loc-${loc.loc_id}`} value={loc.loc_id}>Location {loc.loc_id}</option>)}
       </select>
     );
   };
@@ -76,7 +80,7 @@ const RunEditor: React.FC<{ locations: Array<Location>, runInstructions: Array<R
       <select onChange={addAction}>
         {lastLocation ?
           lastLocation.actions.map(
-            (act) => <option value={act.action_id}>{act.action_id}</option>
+            (act) => <option key={`opt-act-${act.action_id}`} value={act.action_id}>{act.action_id}</option>
           ) : []
         }
       </select>

@@ -43,16 +43,26 @@ const Arena: React.FC = () => {
     const rect = event.currentTarget.getBoundingClientRect();
 
     if (dragging && dragStart && dragEnd) {
-      setExclusions((xs) => xs.concat([
-        {
-          top_left: {
-            x: Math.min(dragStart.x, dragEnd.x),
-            y: Math.min(dragStart.y, dragEnd.y)
-          },
-          width: Math.abs(dragStart.x - dragEnd.x),
-          height: Math.abs(dragStart.y - dragEnd.y)
+      if (mode === 'layout') {
+        setExclusions((xs) => xs.concat([
+          {
+            top_left: {
+              x: Math.min(dragStart.x, dragEnd.x),
+              y: Math.min(dragStart.y, dragEnd.y)
+            },
+            width: Math.abs(dragStart.x - dragEnd.x),
+            height: Math.abs(dragStart.y - dragEnd.y)
+          }
+        ]));
+      } else if (mode === 'measure') {
+        const width = Math.abs(dragStart.x - dragEnd.x);
+        const height = Math.abs(dragStart.y - dragEnd.y);
+        if (width > height) {
+
+        } else {
+
         }
-      ]));
+      }
       setDragging(false);
     } else {
       const loc = {
@@ -77,13 +87,23 @@ const Arena: React.FC = () => {
 
   const handleClearClick: MouseEventHandler<HTMLButtonElement> = (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
     setLocations({ label_idx: 0, locations: [] });
-    setExclusions([])
+    setExclusions([]);
+    setInstrs([]);
   };
 
-  const updateLocation = (loc: Location, i: number) => {
+  const updateLocation = (loc: Location | null, i: number) => {
+    console.log(`Updating location information at ${i}`);
     setLocations((aloc) => {
-      aloc.locations[i] = loc;
-      return aloc;
+      if (loc !== null) {
+        aloc.locations[i] = loc;
+      } else {
+        aloc.locations.splice(i, 1);
+      }
+      console.log(`After update, locations array has length ${aloc.locations.length}`);
+      return ({
+        label_idx: aloc.label_idx,
+        locations: aloc.locations
+      });
     })
   };
 
@@ -145,9 +165,11 @@ const Arena: React.FC = () => {
       </div>
       <div className='Arena-locations'>
         <ul>
-          {locations.locations.map((loc, i) => {
-            return (<li key={`location-${i}`}><LocationEditor location={loc} setLocation={(newLoc) => updateLocation(newLoc, i)} /></li>)
-          })}
+          {locations.locations.map((loc, i) => 
+            <li key={`location-${i}`}>
+              <LocationEditor location={loc} setLocation={(newLoc) => updateLocation(newLoc, i)} />
+            </li>
+          )}
         </ul>
       </div>
       <div className='Arena-run-instructions'>

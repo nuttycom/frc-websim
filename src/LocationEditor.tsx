@@ -3,7 +3,7 @@ import { GameAction, Location } from "./Game";
 import ActionEditor from "./ActionEditor";
 import './LocationEditor.css';
 
-type SetLocation = (loc: Location) => void;
+type SetLocation = (loc: Location | null) => void;
 
 const LocationEditor: React.FC<{ location: Location, setLocation: SetLocation }> = (props) => {
   const [actions, setActions] = useState<Array<GameAction>>([]);
@@ -24,13 +24,22 @@ const LocationEditor: React.FC<{ location: Location, setLocation: SetLocation }>
     })
   };
 
+  const deleteLocation = (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+    props.setLocation(null);
+  };
+
+
   const actionElems: Array<JSX.Element> = actions.map((act, i) => {
-    return (<li key={`${props.location.loc_id}-actions-${i}`}><ActionEditor action={act} setAction={(newAct) => updateAction(newAct, i)} /> </li>)
+    return (
+      <li key={`${props.location.loc_id}-actions-${i}`}>
+        <ActionEditor action={act} setAction={(newAct) => updateAction(newAct, i)} /> 
+      </li>
+    );
   });
 
   return (
     <div className="LocationEditor">
-      <span className='LocationEditor-loc_id'>Location {props.location.loc_id}</span>
+      <span className='LocationEditor-loc_id'>Location {props.location.loc_id} <button onClick={deleteLocation}>X</button></span>
       <ul className='LocationEditor-actions'>
         <li>
           <button className="LocationEditor-addGameActionButton" onClick={addGameAction} type="button">
