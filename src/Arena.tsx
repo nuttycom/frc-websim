@@ -11,18 +11,35 @@ export const labels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const robot = new Image();
 robot.src = robotPng;
 
+type ArenaState = {
+  save_version: number,
+  mode: 'layout' | 'measure',
+  labelIdx: number,
+  locations: Array<Location>,
+  exclusions: Array<Exclusion>,
+  instrs: Array<Runnable>,
+
+  robotVelocity: number,
+  animationRate: number,
+  measureWidth: number,
+  realWidth: number,
+  measureHeight: number,
+  realHeight : number,
+};
+
 const Arena: React.FC = () => {
-  const [robotVelocity, setRobotVelocity] = useState<number>(1);
-  const [animationRate, setAnimationRate] = useState<number>(30);
   const [mode, setMode] = useState<'layout' | 'measure'>('measure');
-  const [measureWidth, setMeasureWidth] = useState<number>(NaN);
-  const [realWidth, setRealWidth] = useState<number>(10);
-  const [measureHeight, setMeasureHeight] = useState<number>(NaN);
-  const [realHeight, setRealHeight] = useState<number>(5);
   const [labelIdx, setLabelIdx] = useState<number>(0);
   const [locations, setLocations] = useState<Array<Location>>([]);
   const [exclusions, setExclusions] = useState<Array<Exclusion>>([]);
   const [instrs, setInstrs] = useState<Array<Runnable>>([]);
+
+  const [robotVelocity, setRobotVelocity] = useState<number>(2);
+  const [animationRate, setAnimationRate] = useState<number>(30);
+  const [measureWidth, setMeasureWidth] = useState<number>(NaN);
+  const [realWidth, setRealWidth] = useState<number>(10);
+  const [measureHeight, setMeasureHeight] = useState<number>(NaN);
+  const [realHeight, setRealHeight] = useState<number>(5);
 
   const [mouseDown, setMouseDown] = useState<boolean>(false);
   const [dragging, setDragging] = useState<boolean>(false);
@@ -55,7 +72,26 @@ const Arena: React.FC = () => {
     if (running) return;
     const rect = event.currentTarget.getBoundingClientRect();
 
-    if (dragging && dragStart && dragEnd) {
+    const getDragArea = () => {
+      if (dragging && dragStart && dragEnd) {
+        const result = {
+          width: Math.abs(dragStart.x - dragEnd.x),
+          height: Math.abs(dragStart.y - dragEnd.y)
+        };
+
+        // guard against clicks that get misinterpreted as drags
+        if (result.width > 20 || result.height > 20) {
+          return result;
+        } else {
+          return null;
+        }
+      } else {
+        return null;
+      }
+    }
+
+    const drag_area = getDragArea();
+    if (drag_area !== null && dragStart && dragEnd) {
       if (mode === 'layout') {
         setExclusions((xs) => xs.concat([
           {
@@ -63,17 +99,15 @@ const Arena: React.FC = () => {
               x: Math.min(dragStart.x, dragEnd.x),
               y: Math.min(dragStart.y, dragEnd.y)
             },
-            width: Math.abs(dragStart.x - dragEnd.x),
-            height: Math.abs(dragStart.y - dragEnd.y)
+            width: drag_area.width,
+            height: drag_area.height,
           }
         ]));
       } else if (mode === 'measure') {
-        const width = Math.abs(dragStart.x - dragEnd.x);
-        const height = Math.abs(dragStart.y - dragEnd.y);
-        if (width > height) {
-          setMeasureWidth(width);
+        if (drag_area.width > drag_area.height) {
+          setMeasureWidth(drag_area.width);
         } else {
-          setMeasureHeight(height);
+          setMeasureHeight(drag_area.height);
         }
       }
       setDragging(false);
@@ -122,10 +156,61 @@ const Arena: React.FC = () => {
 
   const handleClearClick: MouseEventHandler<HTMLButtonElement> = (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
     if (running) return;
+    setMode('measure');
     setLabelIdx(0);
     setLocations([]);
     setExclusions([]);
     setInstrs([]);
+
+    setRobotVelocity(2);
+    setAnimationRate(30);
+    setMeasureWidth(NaN);
+    setRealHeight(5);
+    setMeasureHeight(NaN);
+    setRealWidth(10);
+  };
+
+  const handleSaveClick: MouseEventHandler<HTMLButtonElement> = (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+    const save_json = JSON.stringify({
+      save_version: 1,
+      mode: mode,
+      labelIdx: labelIdx,
+      locations: locations,
+      exclusions: exclusions,
+      instrs: instrs,
+
+      robotVelocity: robotVelocity,
+      animationRate: animationRate,
+      measureWidth: measureWidth,
+      realWidth: realWidth,
+      measureHeight: measureHeight,
+      realHeight : realHeight
+    });
+
+    localStorage.setItem('websim-powerup-v1', save_json);
+  };
+
+  const handleRestoreClick: MouseEventHandler<HTMLButtonElement> = (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+    const save_json = localStorage.getItem('websim-powerup-v1');
+    if (save_json) {
+      const saved = JSON.parse(save_json) as ArenaState;
+      if (saved.save_version === 1) {
+        setMode(saved.mode);
+        setLabelIdx(saved.labelIdx);
+        setLocations(saved.locations);
+        setExclusions(saved.exclusions);
+        setInstrs(saved.instrs);
+
+        setRobotVelocity(saved.robotVelocity);
+        setAnimationRate(saved.animationRate);
+        setMeasureWidth(saved.measureWidth);
+        setRealHeight(saved.realHeight);
+        setMeasureHeight(saved.measureHeight);
+        setRealWidth(saved.realWidth);
+      } else {
+        console.log(`Save format ${save_json} not recognized.`);
+      }
+    }
   };
 
   const handleRunClick: MouseEventHandler<HTMLButtonElement> = (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
@@ -286,6 +371,8 @@ const Arena: React.FC = () => {
       <div>
         <button onClick={handleClearClick}>Clear</button>
         <button onClick={handleRunClick} disabled={instrs.length === 0}>{runLabel}</button>
+        <button onClick={handleSaveClick}>Save</button>
+        <button onClick={handleRestoreClick}>Restore</button>
       </div>
       <div className='Arena-locations'>
         <ul>

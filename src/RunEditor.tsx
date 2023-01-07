@@ -1,20 +1,8 @@
 import React, { useState } from "react";
-import { Location, Runnable, RunAlg, Act, Move, Start } from "./Game";
+import { Location, Runnable } from "./Game";
 import './RunEditor.css';
 
 type SetRunInstructions = (instructions: Array<Runnable>) => void;
-
-class RenderRunnable implements RunAlg<JSX.Element> {
-  start(start: Start): JSX.Element {
-    return (<span>Start at location "{start.loc_id}"</span>);
-  }
-  move(move: Move): JSX.Element {
-    return (<span>Move to location "{move.dest_loc_id}"</span>);
-  }
-  act(act: Act): JSX.Element {
-    return (<span>Take action "{act.action_id}"</span>);
-  }
-}
 
 const RunEditor: React.FC<{
   locations: Array<Location>,
@@ -36,7 +24,7 @@ const RunEditor: React.FC<{
   const setStart = (event: React.ChangeEvent<HTMLSelectElement>) => {
     if (event.target.value !== 'placeholder') {
       setLastLocation(props.locations.find((loc) => loc.loc_id === event.target.value))
-      props.setRunInstructions(props.runInstructions.concat([new Start(event.target.value)]));
+      props.setRunInstructions(props.runInstructions.concat({ kind: 'start', loc_id: event.target.value }));
       setRunnableType('move');
     }
   };
@@ -44,14 +32,14 @@ const RunEditor: React.FC<{
   const addMove = (event: React.ChangeEvent<HTMLSelectElement>) => {
     if (event.target.value !== 'placeholder') {
       setLastLocation(props.locations.find((loc) => loc.loc_id === event.target.value))
-      props.setRunInstructions(props.runInstructions.concat([new Move(event.target.value)]));
+      props.setRunInstructions(props.runInstructions.concat({ kind: 'move', dest_loc_id: event.target.value }));
       setRunnableType('move');
     }
   };
 
   const addAction = (event: React.ChangeEvent<HTMLSelectElement>) => {
     if (event.target.value !== 'placeholder') {
-      props.setRunInstructions(props.runInstructions.concat([new Act(event.target.value)]));
+      props.setRunInstructions(props.runInstructions.concat({ kind: 'act', action_id: event.target.value }));
       setRunnableType('move');
     }
   };
@@ -59,10 +47,19 @@ const RunEditor: React.FC<{
   // Rendering Elements
 
   const runElems: Array<JSX.Element> = props.runInstructions.map((instr, i) => {
-    const renderer = new RenderRunnable();
+    const renderRunnable = (r: Runnable) => {
+      if (r.kind === 'start') {
+        return (<span>Start at location "{r.loc_id}"</span>);
+      } else if (r.kind === 'move') {
+        return (<span>Move to location "{r.dest_loc_id}"</span>);
+      } else if (r.kind === 'act') {
+        return (<span>Take action "{r.action_id}"</span>);
+      }
+    };
+
     return (
       <li key={`runnable-${i}`}>
-        {instr.apply(renderer)}
+        {renderRunnable(instr)}
       </li>
     );
   });

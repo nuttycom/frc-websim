@@ -28,51 +28,10 @@ export type Location = {
   actions: Array<GameAction>;
 };
 
-export interface Runnable {
-  apply<A>(alg: RunAlg<A>): A;
-}
-
-export interface RunAlg<A> {
-  start(start: Start): A
-  move(move: Move): A
-  act(act: Act): A
-}
-
-export class Start implements Runnable {
-  loc_id: string;
-
-  constructor(loc_id: string) {
-    this.loc_id = loc_id;
-  }
-
-  apply<A>(alg: RunAlg<A>): A {
-    return alg.start(this)
-  }
-}
-
-export class Move implements Runnable {
-  dest_loc_id: string;
-
-  constructor(loc_id: string) {
-    this.dest_loc_id = loc_id;
-  }
-
-  apply<A>(alg: RunAlg<A>): A {
-    return alg.move(this)
-  }
-}
-
-export class Act implements Runnable {
-  action_id: string;
-
-  constructor(action_id: string) {
-    this.action_id = action_id;
-  }
-
-  apply<A>(alg: RunAlg<A>): A {
-    return alg.act(this)
-  }
-}
+export type Runnable = 
+  | { kind: "start", loc_id: string }
+  | { kind: "move", dest_loc_id: string }
+  | { kind: "act", action_id: string };
 
 export type Step = {
   position: Position,
@@ -98,9 +57,9 @@ export function computeSteps(
 
   var cur_loc: Location;
   const steps: Array<Step> = [];
-  const addSteps = {
-    start: (s: Start) => {
-      const loc = locations.find((l) => l.loc_id === s.loc_id);
+  const addSteps = (r: Runnable) => {
+    if (r.kind === 'start') {
+      const loc = locations.find((l) => l.loc_id === r.loc_id);
       if (loc) {
         cur_loc = loc;
         steps.push({
@@ -108,9 +67,8 @@ export function computeSteps(
           award: 0
         })
       }
-    },
-    move: (m: Move) => {
-      const loc = locations.find((l) => l.loc_id === m.dest_loc_id);
+    } else if (r.kind === 'move') {
+      const loc = locations.find((l) => l.loc_id === r.dest_loc_id);
       if (loc) {
         const dx = loc.position.x - cur_loc.position.x;
         const dy = loc.position.y - cur_loc.position.y;
@@ -124,9 +82,9 @@ export function computeSteps(
         const step_count = path_time_seconds * animation_rate;
         const x_step = dx / step_count;
         const y_step = dy / step_count;
-        for (var j = 0; j < step_count; j++) {
+        for (var mi = 0; mi < step_count; mi++) {
           steps.push({
-            position: { x: cur_loc.position.x + x_step * j, y: cur_loc.position.y + y_step * j },
+            position: { x: cur_loc.position.x + x_step * mi, y: cur_loc.position.y + y_step * mi },
             award: 0,
           });
         }
@@ -137,12 +95,11 @@ export function computeSteps(
         });
         cur_loc = loc;
       }
-    },
-    act: (a: Act) => {
-      const act = cur_loc.actions.find((act) => act.action_id === a.action_id);
+    } else if (r.kind === 'act') {
+      const act = cur_loc.actions.find((act) => act.action_id === r.action_id);
       if (act) {
         const step_count = act.duration * animation_rate;
-        for (var j = 0; j < step_count; j++) {
+        for (var ai = 0; ai < step_count; ai++) {
           steps.push({
             position: { x: cur_loc.position.x, y: cur_loc.position.y },
             award: 0,
@@ -157,7 +114,7 @@ export function computeSteps(
   };
 
   for (var i = 0; i < instrs.length; i++) {
-    instrs[i].apply(addSteps);
+    addSteps(instrs[i]);
   }
 
   return steps;
