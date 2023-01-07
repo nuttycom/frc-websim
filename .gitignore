@@ -11,6 +11,7 @@
 # production
 /build
 /result
+websim.tgz
 
 # misc
 .DS_Store

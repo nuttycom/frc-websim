@@ -28,6 +28,64 @@ export type Location = {
   actions: Array<GameAction>;
 };
 
+export type ItemId = 'cone' | 'cube';
+
+export type FieldElement<IdT> = {
+  elem_id: IdT,
+  loc_id: string,
+  items: Map<ItemId, number>
+};
+
+type CNode = 'cone' | null;
+type BNode = 'block' | null;
+type HNode = 'cone' | 'block' | null;
+
+export type Row = { a: CNode, b: BNode, c: CNode };
+export type HybridRow = { a: HNode, b: HNode, c: HNode };
+
+function empty_row(): Row {
+  return ({ a: null, b: null, c: null });
+}
+
+function empty_hybrid_row(): Row {
+  return ({ a: null, b: null, c: null });
+}
+
+export type Grid = {
+  top: Row,
+  mid: Row,
+  low: HybridRow,
+};
+
+function empty_grid(): Grid {
+  return ({top: empty_row(), mid: empty_row(), low: empty_hybrid_row()});
+}
+
+export type Station = {
+  docked: number,
+  engaged: number
+};
+
+function empty_station(): Station {
+  return ({ docked: 0, engaged: 0 });
+}
+
+export type FieldState = {
+  blue_grids: [Grid, Grid, Grid];
+  blue_station: Station;
+  red_grids: [Grid, Grid, Grid];
+  red_station: Station;
+};
+
+function empty_field(): FieldState {
+  return({
+    blue_grids: [empty_grid(), empty_grid(), empty_grid()],
+    blue_station: empty_station(),
+    red_grids: [empty_grid(), empty_grid(), empty_grid()],
+    red_station: empty_station(),
+  });
+}
+
 export type Runnable = 
   | { kind: "start", loc_id: string }
   | { kind: "move", dest_loc_id: string }
@@ -37,6 +95,26 @@ export type Step = {
   position: Position,
   award: number
 }
+
+type ElemType = 'node' | 'charge_station';
+
+export function updateFieldState(fieldState: FieldState, loc: Location, action_id: string): FieldState {
+  if (loc.loc_id == 'M') {
+    fieldState.blue_station.engaged += 1;
+  } else if (fieldState.blue_station.engaged > 0) {
+    fieldState.blue_station.engaged -= 1;
+  }
+
+  return fieldState;
+}
+
+export function computeFieldAward(fieldState: FieldState, elapsed_seconds: number): number {
+  if (elapsed_seconds > 15 && elapsed_seconds < 18 && fieldState.blue_station.engaged > 0) {
+    return 12;
+  } else {
+    return 0;
+  }
+};
 
 export function computeSteps(
   instrs: Array<Runnable>,
@@ -55,6 +133,8 @@ export function computeSteps(
     return [];
   }
 
+  var field_state: FieldState = empty_field();
+  var elapsed_seconds: number;
   var cur_loc: Location;
   const steps: Array<Step> = [];
   const addSteps = (r: Runnable) => {
@@ -80,12 +160,14 @@ export function computeSteps(
         );
         const path_time_seconds = path_meters / robot_velocity;
         const step_count = path_time_seconds * animation_rate;
+        const step_seconds = path_time_seconds / step_count;
         const x_step = dx / step_count;
         const y_step = dy / step_count;
         for (var mi = 0; mi < step_count; mi++) {
+          elapsed_seconds += step_seconds;
           steps.push({
             position: { x: cur_loc.position.x + x_step * mi, y: cur_loc.position.y + y_step * mi },
-            award: 0,
+            award: computeFieldAward(field_state, elapsed_seconds),
           });
         }
         // add a step to take us to the final position, since we'll have not quite arrived there.
@@ -99,10 +181,13 @@ export function computeSteps(
       const act = cur_loc.actions.find((act) => act.action_id === r.action_id);
       if (act) {
         const step_count = act.duration * animation_rate;
+        const step_seconds = act.duration / step_count;
         for (var ai = 0; ai < step_count; ai++) {
+          elapsed_seconds += step_seconds;
+          field_state = updateFieldState(field_state, cur_loc, r.action_id);
           steps.push({
             position: { x: cur_loc.position.x, y: cur_loc.position.y },
-            award: 0,
+            award: computeFieldAward(field_state, elapsed_seconds),
           });
         }
         steps.push({

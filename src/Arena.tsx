@@ -1,12 +1,16 @@
 import React, { useEffect, useCallback, useRef, useState, MouseEventHandler, ChangeEventHandler } from 'react';
 import arena from './arena.png';
 import robotPng from './robot.png';
-import { Exclusion, Position, Location, Runnable, computeSteps, Step } from './Game';
+import { Exclusion, Position, Location, Runnable, computeSteps, Step, GameAction } from './Game';
 import LocationEditor from './LocationEditor';
 import './Arena.css';
 import RunEditor from './RunEditor';
 
-export const labels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const labels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const game_id = 'chargedup';
+const save_version = 1;
+
+const save_key = `websim-${game_id}-v${save_version}`;
 
 const robot = new Image();
 robot.src = robotPng;
@@ -24,7 +28,123 @@ type ArenaState = {
   measureWidth: number,
   realWidth: number,
   measureHeight: number,
-  realHeight : number,
+  realHeight: number,
+};
+
+function grid_col_actions(piece_id: 'cone' | 'block'): Array<GameAction> {
+  return [
+    { "action_id": "place_high", "reward": 6, "duration": 2, "produces": [], "consumes": [{ "piece_id": piece_id, "count": 1 }] },
+    { "action_id": "place_mid", "reward": 4, "duration": 2, "produces": [], "consumes": [{ "piece_id": piece_id, "count": 1 }] },
+    { "action_id": "place_low", "reward": 3, "duration": 1, "produces": [], "consumes": [{ "piece_id": piece_id, "count": 1 }] }
+  ];
+};
+
+function loading_zone_actions(): Array<GameAction> {
+  return [
+    { "action_id": "take_cone", "reward": 0, "duration": 2, "produces": [{ "piece_id": "block", "count": 1 }], "consumes": [] },
+    { "action_id": "take_block", "reward": 0, "duration": 2, "produces": [{ "piece_id": "cone", "count": 1 }], "consumes": [] }
+  ];
+};
+
+const preloadState: ArenaState = {
+  "save_version": 1,
+  "mode": "measure",
+  "labelIdx": 16,
+  "locations": [
+    {
+      "loc_id": "A",
+      "position": { "x": 170, "y": 356 },
+      "actions": grid_col_actions('cone'),
+    },
+    {
+      "loc_id": "B",
+      "position": { "x": 170, "y": 326 },
+      "actions": grid_col_actions('block')
+    },
+    {
+      "loc_id": "C",
+      "position": { "x": 170, "y": 304 },
+      "actions": grid_col_actions('cone'),
+    },
+    {
+      "loc_id": "D",
+      "position": { "x": 170, "y": 284 },
+      "actions": grid_col_actions('cone')
+    },
+    {
+      "loc_id": "E",
+      "position": { "x": 170, "y": 264 },
+      "actions": grid_col_actions('cone')
+    },
+    {
+      "loc_id": "F",
+      "position": { "x": 170, "y": 235 },
+      "actions": grid_col_actions('block')
+    },
+    {
+      "loc_id": "G",
+      "position": { "x": 170, "y": 217 },
+      "actions": grid_col_actions('cone')
+    },
+    {
+      "loc_id": "H",
+      "position": { "x": 170, "y": 194 },
+      "actions": grid_col_actions('cone')
+    },
+    {
+      "loc_id": "I",
+      "position": { "x": 170, "y": 170 },
+      "actions": grid_col_actions('block')
+    },
+    {
+      "loc_id": "J",
+      "position": { "x": 610, "y": 54 },
+      "actions": loading_zone_actions()
+    },
+    {
+      "loc_id": "K",
+      "position": { "x": 672, "y": 75 },
+      "actions": loading_zone_actions()
+    },
+    {
+      "loc_id": "L",
+      "position": { "x": 674, "y": 122 },
+      "actions": loading_zone_actions()
+    }, 
+    {
+      "loc_id": "M",
+      "position": { "x": 241, "y": 263 },
+      "actions": [],
+    },
+    {
+      "loc_id": "N",
+      "position": { "x": 345, "y": 190 },
+      "actions": loading_zone_actions()
+    },
+    {
+      "loc_id": "O",
+      "position": { "x": 348, "y": 236 },
+      "actions": loading_zone_actions()
+    },
+    {
+      "loc_id": "P",
+      "position": { "x": 345, "y": 285 },
+      "actions": loading_zone_actions()
+    },
+    {
+      "loc_id": "Q",
+      "position": { "x": 349, "y": 336 },
+      "actions": loading_zone_actions()
+    }
+  ],
+  "exclusions": [],
+  "instrs": [],
+  "robotVelocity": 2,
+  "animationRate": 30,
+  "measureWidth": 580,
+  "realWidth": 1654,
+  "measureHeight": 326,
+  "realHeight": 802
 };
 
 const Arena: React.FC = () => {
@@ -47,6 +167,7 @@ const Arena: React.FC = () => {
   const [dragEnd, setDragEnd] = useState<Position | null>(null);
   const [running, setRunning] = useState<boolean>(false);
   const [runLabel, setRunLabel] = useState<string>('Run');
+  const [showLocEditor, setShowLocEditor] = useState<boolean>(true);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animStartRef = useRef<Date>(new Date());
@@ -172,7 +293,7 @@ const Arena: React.FC = () => {
 
   const handleSaveClick: MouseEventHandler<HTMLButtonElement> = (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
     const save_json = JSON.stringify({
-      save_version: 1,
+      save_version: save_version,
       mode: mode,
       labelIdx: labelIdx,
       locations: locations,
@@ -184,17 +305,16 @@ const Arena: React.FC = () => {
       measureWidth: measureWidth,
       realWidth: realWidth,
       measureHeight: measureHeight,
-      realHeight : realHeight
+      realHeight: realHeight
     });
 
-    localStorage.setItem('websim-powerup-v1', save_json);
+    console.log(save_json);
+
+    localStorage.setItem(save_key, save_json);
   };
 
-  const handleRestoreClick: MouseEventHandler<HTMLButtonElement> = (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
-    const save_json = localStorage.getItem('websim-powerup-v1');
-    if (save_json) {
-      const saved = JSON.parse(save_json) as ArenaState;
-      if (saved.save_version === 1) {
+  const loadArenaState = (saved: ArenaState) => {
+    if (saved.save_version === save_version) {
         setMode(saved.mode);
         setLabelIdx(saved.labelIdx);
         setLocations(saved.locations);
@@ -208,8 +328,21 @@ const Arena: React.FC = () => {
         setMeasureHeight(saved.measureHeight);
         setRealWidth(saved.realWidth);
       } else {
-        console.log(`Save format ${save_json} not recognized.`);
-      }
+      console.log(`Save version ${saved.save_version} not recognized`);
+    }
+  };
+
+  const handleResetClick: MouseEventHandler<HTMLButtonElement> = (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+    loadArenaState(preloadState);
+  };
+
+  const handleRestoreClick: MouseEventHandler<HTMLButtonElement> = (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+    const save_json = localStorage.getItem(save_key);
+    if (save_json) {
+      const saved = JSON.parse(save_json) as ArenaState;
+      loadArenaState(saved);
+    } else {
+      console.log(`Save format ${save_json} not recognized.`);
     }
   };
 
@@ -219,8 +352,8 @@ const Arena: React.FC = () => {
       setRunLabel('Run');
       animStepsRef.current = [];
     } else {
-      console.log(`x ratio: ${measureWidth}/${realWidth}`);
-      console.log(`y ratio: ${measureHeight}/${realHeight}`);
+      console.log(`x ratio: ${measureWidth}/${realWidth / 100}`);
+      console.log(`y ratio: ${measureHeight}/${realHeight / 100}`);
       animStartRef.current = new Date();
       animStepsRef.current = computeSteps(
         instrs,
@@ -233,6 +366,10 @@ const Arena: React.FC = () => {
       setRunning(true);
       setRunLabel('Stop');
     }
+  };
+
+  const handleToggleLocEditorClick: MouseEventHandler<HTMLButtonElement> = (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+    setShowLocEditor((show) => !show);
   };
 
   const updateLocation = (loc: Location | null, i: number) => {
@@ -354,7 +491,7 @@ const Arena: React.FC = () => {
         {!isNaN(measureWidth) ?
           <div>
             <label htmlFor='measuredWidth'>Measured Width</label>
-            <input id='measuredWidth' type='text' placeholder='Meters'
+            <input id='measuredWidth' type='text' placeholder='cm'
               value={realWidth ? realWidth.toString() : ''}
               onChange={handleWidthChange} />
           </div> : <></>
@@ -362,7 +499,7 @@ const Arena: React.FC = () => {
         {!isNaN(measureHeight) ?
           <div>
             <label htmlFor='measuredHeight'>Measured Height</label>
-            <input id='measuredHeight' type='text' placeholder='Meters'
+            <input id='measuredHeight' type='text' placeholder='cm'
               value={realHeight ? realHeight.toString() : ''}
               onChange={handleHeightChange} />
           </div> : <></>
@@ -371,11 +508,13 @@ const Arena: React.FC = () => {
       <div>
         <button onClick={handleClearClick}>Clear</button>
         <button onClick={handleRunClick} disabled={instrs.length === 0}>{runLabel}</button>
+        <button onClick={handleResetClick}>Reset</button>
         <button onClick={handleSaveClick}>Save</button>
-        <button onClick={handleRestoreClick}>Restore</button>
+        <button onClick={handleRestoreClick} disabled={localStorage.getItem(save_key) === null}>Restore</button>
       </div>
       <div className='Arena-locations'>
-        <ul>
+        <button onClick={handleToggleLocEditorClick}>Toggle Location Editor</button>
+        <ul style={{ display: showLocEditor ? "block" : "none" }}>
           {locations.map((loc, i) =>
             <li key={`location-${i}`}>
               <LocationEditor location={loc} setLocation={(newLoc) => updateLocation(newLoc, i)} />
