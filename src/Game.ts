@@ -7,7 +7,8 @@ export type GameAction = {
   action_id: string;
   produces: Array<Resource>;
   consumes: Array<Resource>;
-  reward: number
+  reward: number;
+  duration: number;
 };
 
 export type Position = {
@@ -73,3 +74,90 @@ export class Act implements Runnable {
   }
 }
 
+export type Step = {
+  position: Position,
+  award: number
+}
+
+export function computeSteps(
+  instrs: Array<Runnable>, 
+  locations: Array<Location>,
+  //exclusions: Array<Exclusion>,
+  robot_velocity: number, // meters/second
+  x_ratio: number, // pixels/meter
+  y_ratio: number, // pixels/meter
+  animation_rate: number, // steps/second
+): Array<Step> {
+  if (!(x_ratio > 0 && y_ratio > 0 && animation_rate > 0 && robot_velocity > 0)) {
+    console.log(`robot velocity: ${robot_velocity}`);
+    console.log(`x ratio: ${x_ratio}`);
+    console.log(`y ratio: ${y_ratio}`);
+    console.log(`anim rate: ${animation_rate}`);
+    return [];
+  }
+
+  var steps: Array<Step> = [];
+
+  var cur_loc: Location;
+  for (var i = 0; i < instrs.length; i++) {
+    instrs[i].apply({
+      start: (s) => {
+        const loc = locations.find((l) => l.loc_id === s.loc_id);
+        if (loc) {
+          cur_loc = loc;
+          steps.push({
+            position: loc.position,
+            award: 0
+          })
+        }
+      },
+      move: (m) => {
+        const loc = locations.find((l) => l.loc_id === m.dest_loc_id);
+        if (loc) {
+          const dx = loc.position.x - cur_loc.position.x;
+          const dy = loc.position.y - cur_loc.position.y;
+          // Find the number of steps in the path using real-world distance (just
+          // straight-line paths not considering exclusions for now)
+          const path_meters = Math.sqrt(
+            Math.pow(Math.abs(dx) / x_ratio, 2) + 
+            Math.pow(Math.abs(dy) / y_ratio, 2) 
+          );
+          const path_time_seconds = path_meters / robot_velocity;
+          const step_count = path_time_seconds * animation_rate;
+          const x_step = dx / step_count;
+          const y_step = dy / step_count;
+          for (var j = 0; j < step_count; j++) {
+            steps.push({
+              position: { x: cur_loc.position.x + x_step * j, y: cur_loc.position.y + y_step * j},
+              award: 0,
+            });
+          }
+          // add a step to take us to the final position, since we'll have not quite arrived there.
+          steps.push({
+            position: { x: loc.position.x, y: loc.position.y},
+            award: 0,
+          });
+          cur_loc = loc;
+        }
+      },
+      act: (a) => {
+        const act = cur_loc.actions.find((act) => act.action_id === a.action_id);
+        if (act) {
+          const step_count = act.duration * animation_rate;
+          for (var j = 0; j < step_count; j++) {
+            steps.push({
+              position: { x: cur_loc.position.x, y: cur_loc.position.y},
+              award: 0,
+            });
+          }
+          steps.push({
+            position: { x: cur_loc.position.x, y: cur_loc.position.y},
+            award: act.reward,
+          });
+        }
+      }
+    })
+  }
+
+  return steps;
+}

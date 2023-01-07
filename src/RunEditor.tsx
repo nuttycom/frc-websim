@@ -22,7 +22,7 @@ const RunEditor: React.FC<{
   setRunInstructions: SetRunInstructions
 }> = (props) => {
   //const [instrs, setInstrs] = useState<Array<Runnable>>(props.runInstructions);
-  const [runnableType, setRunnableType] = useState<string>('placeholder');
+  const [runnableType, setRunnableType] = useState<string>('move');
   const [lastLocation, setLastLocation] = useState<Location | undefined>(undefined);
 
   // Effect Handlers
@@ -37,7 +37,7 @@ const RunEditor: React.FC<{
     if (event.target.value !== 'placeholder') {
       setLastLocation(props.locations.find((loc) => loc.loc_id === event.target.value))
       props.setRunInstructions(props.runInstructions.concat([new Start(event.target.value)]));
-      setRunnableType('placeholder');
+      setRunnableType('move');
     }
   };
 
@@ -45,14 +45,14 @@ const RunEditor: React.FC<{
     if (event.target.value !== 'placeholder') {
       setLastLocation(props.locations.find((loc) => loc.loc_id === event.target.value))
       props.setRunInstructions(props.runInstructions.concat([new Move(event.target.value)]));
-      setRunnableType('placeholder');
+      setRunnableType('move');
     }
   };
 
   const addAction = (event: React.ChangeEvent<HTMLSelectElement>) => {
     if (event.target.value !== 'placeholder') {
       props.setRunInstructions(props.runInstructions.concat([new Act(event.target.value)]));
-      setRunnableType('placeholder');
+      setRunnableType('move');
     }
   };
 
@@ -99,7 +99,6 @@ const RunEditor: React.FC<{
         <li key='run-control'>
           <span>Then</span>
           <select className='runnable-type-select' value={runnableType} onChange={runnableTypeSelected}>
-            <option value={'placeholder'}>(select one)</option>
             <option value={'move'}>Move</option>
             <option value={'act'}>Take Action</option>
           </select>

@@ -7,7 +7,7 @@ type SetLocation = (loc: Location | null) => void;
 
 const LocationEditor: React.FC<{ location: Location, setLocation: SetLocation }> = (props) => {
   const addGameAction = (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
-    const newAction: GameAction = { action_id: "", produces: [], consumes: [], reward: 0 };
+    const newAction: GameAction = { action_id: "", reward: NaN, duration: NaN, produces: [], consumes: []};
     props.setLocation({...props.location, actions: props.location.actions.concat(newAction)})
   };
 

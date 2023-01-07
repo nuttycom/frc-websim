@@ -10,6 +10,17 @@
   margin-right: 3px;
 }
 
+.ActionEditor-action_attrs {
+  display: block;
+  margin-left: 3px;
+  margin-right: 3px;
+  text-align: right;
+}
+
+.ActionEditor-action_attrs label {
+  display: inline-block;
+}
+
 .ActionEditor-resources {
   display: block;
   margin-left: 3px;

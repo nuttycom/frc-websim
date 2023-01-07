@@ -42,6 +42,30 @@
   align-items: center;
 }
 
+.Arena-measure_editor {
+  font-size: 12pt;
+  width: 80%;
+  margin: 0 auto;
+}
+
+.Arena-measure_editor label, input {
+  display: inline-block;
+}
+
+.Arena-measure_editor label {
+  width: 30%;
+  text-align: right;
+}
+
+.Arena-measure_editor label + input {
+  width: 15%;
+  margin: 0 15% 0 1%;
+}
+
+.Arena-measure_editor input + input {
+  float: right;
+}
+
 .Arena-switch_label {
   padding-left: 5px;
   padding-right: 5px;

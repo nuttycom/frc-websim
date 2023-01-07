@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, MouseEventHandler, ChangeEventHandler } from 'react';
 import arena from './arena.png';
-import { Exclusion, Position, Location, Runnable } from './Game';
+import robotPng from './robot.png';
+import { Exclusion, Position, Location, Runnable, computeSteps, Step } from './Game';
 import LocationEditor from './LocationEditor';
 import './Arena.css';
 import RunEditor from './RunEditor';
@@ -12,8 +13,17 @@ export type ArenaLocations = {
 
 export const labels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
+const robot = new Image();
+robot.src = robotPng;
+
 const Arena: React.FC = () => {
+  const [robotVelocity, setRobotVelocity] = useState<number>(1);
+  const [animationRate, setAnimationRate] = useState<number>(30);
   const [mode, setMode] = useState<'layout' | 'measure'>('layout');
+  const [measureWidth, setMeasureWidth] = useState<number>(NaN);
+  const [realWidth, setRealWidth] = useState<number>(10);
+  const [measureHeight, setMeasureHeight] = useState<number>(NaN);
+  const [realHeight, setRealHeight] = useState<number>(5);
   const [locations, setLocations] = useState<ArenaLocations>({ label_idx: 0, locations: [] });
   const [exclusions, setExclusions] = useState<Array<Exclusion>>([]);
   const [instrs, setInstrs] = useState<Array<Runnable>>([]);
@@ -22,16 +32,22 @@ const Arena: React.FC = () => {
   const [dragging, setDragging] = useState<boolean>(false);
   const [dragStart, setDragStart] = useState<Position | null>(null);
   const [dragEnd, setDragEnd] = useState<Position | null>(null);
+  const [running, setRunning] = useState<boolean>(false);
+  const [runLabel, setRunLabel] = useState<string>('Run');
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animStartRef = useRef<Date>(new Date());
+  const animStepsRef = useRef<Array<Step>>([]);
 
   const handleMouseDown: MouseEventHandler<HTMLCanvasElement> = (event: React.MouseEvent<HTMLCanvasElement, MouseEvent>) => {
+    if (running) return;
     const rect = event.currentTarget.getBoundingClientRect();
     setMouseDown(true);
     setDragStart({ x: event.clientX - rect.left, y: event.clientY - rect.top });
   };
 
   const handleMouseMove: MouseEventHandler<HTMLCanvasElement> = (event: React.MouseEvent<HTMLCanvasElement, MouseEvent>) => {
+    if (running) return;
     const rect = event.currentTarget.getBoundingClientRect();
     if (mouseDown) {
       setDragging(true);
@@ -40,6 +56,7 @@ const Arena: React.FC = () => {
   };
 
   const handleMouseUp: MouseEventHandler<HTMLCanvasElement> = (event: React.MouseEvent<HTMLCanvasElement, MouseEvent>) => {
+    if (running) return;
     const rect = event.currentTarget.getBoundingClientRect();
 
     if (dragging && dragStart && dragEnd) {
@@ -58,9 +75,9 @@ const Arena: React.FC = () => {
         const width = Math.abs(dragStart.x - dragEnd.x);
         const height = Math.abs(dragStart.y - dragEnd.y);
         if (width > height) {
-
+          setMeasureWidth(width);
         } else {
-
+          setMeasureHeight(height);
         }
       }
       setDragging(false);
@@ -78,6 +95,7 @@ const Arena: React.FC = () => {
   };
 
   const handleModeSwich: ChangeEventHandler = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (running) return;
     if (event.target.checked) {
       setMode('measure');
     } else {
@@ -85,13 +103,54 @@ const Arena: React.FC = () => {
     }
   };
 
+  const handleVelocityChange: ChangeEventHandler = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (running) return;
+    setRobotVelocity(parseFloat(event.target.value));
+  };
+
+  const handleAnimRateChange: ChangeEventHandler = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (running) return;
+    setAnimationRate(parseInt(event.target.value));
+  };
+
+  const handleHeightChange: ChangeEventHandler = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (running) return;
+    setRealHeight(parseFloat(event.target.value));
+  };
+
+  const handleWidthChange: ChangeEventHandler = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (running) return;
+    setRealWidth(parseFloat(event.target.value));
+  };
+
   const handleClearClick: MouseEventHandler<HTMLButtonElement> = (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+    if (running) return;
     setLocations({ label_idx: 0, locations: [] });
     setExclusions([]);
     setInstrs([]);
   };
 
+  const handleRunClick: MouseEventHandler<HTMLButtonElement> = (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+    if (running) {
+      setRunning(false);
+      setRunLabel('Run');
+    } else {
+      animStartRef.current = new Date();
+      animStepsRef.current = computeSteps(
+        instrs, 
+        locations.locations, 
+        robotVelocity,
+        measureWidth / realWidth,
+        measureHeight / realHeight,
+        animationRate
+      );
+      setRunning(true);
+      setRunLabel('Stop');
+    }
+  };
+
   const updateLocation = (loc: Location | null, i: number) => {
+    if (running) return;
     setLocations((aloc) => {
       if (loc !== null) {
         aloc.locations[i] = loc;
@@ -102,36 +161,76 @@ const Arena: React.FC = () => {
     })
   };
 
-  useEffect(() => {
+  const drawLocations = (ctx: CanvasRenderingContext2D) => {
+    locations.locations.forEach((loc) => {
+      ctx.font = '20px Consolas';
+      ctx.fillStyle = 'black';
+      ctx.fillText(loc.loc_id, loc.position.x - 8, loc.position.y + 5);
+    });
+  };
+
+  const drawExclusions = (ctx: CanvasRenderingContext2D) => {
+    exclusions.forEach((exc) => {
+      ctx.fillStyle = 'rgba(255, 0, 0, 0.25';
+      ctx.fillRect(exc.top_left.x, exc.top_left.y, exc.width, exc.height);
+    });
+  };
+
+  const drawDragState = (ctx: CanvasRenderingContext2D) => {
+    if (dragStart && dragEnd) {
+      const width = Math.abs(dragStart.x - dragEnd.x);
+      const height = Math.abs(dragStart.y - dragEnd.y);
+      if (mode === 'layout') {
+        const ul_x = Math.min(dragStart.x, dragEnd.x);
+        const ul_y = Math.min(dragStart.y, dragEnd.y);
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.25';
+        ctx.fillRect(ul_x, ul_y, width, height);
+      } else if (mode === 'measure') {
+        ctx.beginPath();
+        ctx.moveTo(dragStart.x, dragStart.y);
+        if (width > height) {
+          ctx.lineTo(dragEnd.x, dragStart.y);
+        } else {
+          ctx.lineTo(dragStart.x, dragEnd.y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+      }
+    }
+  };
+
+  const animateRobot = (ctx: CanvasRenderingContext2D) => {
+    if (!running) return;
+
+    const run_time = (new Date()).getTime() - animStartRef.current.getTime();
+    const step_idx = Math.floor((run_time / 1000) * animationRate);
+    if (step_idx < animStepsRef.current.length) {
+      const step = animStepsRef.current[step_idx];
+      ctx.drawImage(robot, step.position.x - 12, step.position.y - 12, 24, 24);
+      window.requestAnimationFrame(draw);
+    } else {
+      setRunning(false);
+      setRunLabel('Run');
+    }
+  };
+
+  const draw = () => {
     const canvas = canvasRef.current;
     if (canvas != null) {
       const ctx = canvas.getContext('2d');
-      canvas.width = 800;
-      canvas.height = 400;
-      if (ctx != null) {
+      if (ctx) {
         ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-        locations.locations.forEach((loc) => {
-          ctx.font = '20px Consolas';
-          ctx.fillStyle = 'black';
-          ctx.fillText(loc.loc_id, loc.position.x - 8, loc.position.y + 5);
-        });
-
-        exclusions.forEach((exc) => {
-          ctx.fillStyle = 'rgba(255, 0, 0, 0.25';
-          ctx.fillRect(exc.top_left.x, exc.top_left.y, exc.width, exc.height);
-        });
-
-        if (mode === 'layout' && dragStart && dragEnd) {
-          ctx.fillStyle = 'rgba(255, 0, 0, 0.25';
-          const ul_x = Math.min(dragStart.x, dragEnd.x);
-          const ul_y = Math.min(dragStart.y, dragEnd.y);
-          const width = Math.abs(dragStart.x - dragEnd.x);
-          const height = Math.abs(dragStart.y - dragEnd.y);
-          ctx.fillRect(ul_x, ul_y, width, height);
-        }
+        drawLocations(ctx);
+        drawExclusions(ctx);
+        drawDragState(ctx);
+        animateRobot(ctx);
       }
     }
-  }, [locations.locations, mode, dragStart, dragEnd, exclusions]);
+  };
+
+  useEffect(() => {
+    window.requestAnimationFrame(draw);
+  }, [locations.locations, mode, dragStart, dragEnd, exclusions, instrs, running]);
 
   return (
     <div className='Arena'>
@@ -139,6 +238,8 @@ const Arena: React.FC = () => {
         <div className='Arena-internal'>
           <img src={arena} className='Arena-background' alt="Robot Arena" />
           <canvas
+            width={800}
+            height={400}
             ref={canvasRef}
             className='Arena-canvas'
             onMouseDown={handleMouseDown}
@@ -147,16 +248,44 @@ const Arena: React.FC = () => {
           ></canvas>
         </div>
       </div>
-      <div>
-        <div className='Arena-switch_row'>
-          <span className='Arena-switch_label'>Layout</span>
-          <input type='checkbox' className='Arena-switch' onChange={handleModeSwich} />
-          <span className='Arena-switch_label'>Measure</span>
+      <div className='Arena-switch_row'>
+        <span className='Arena-switch_label'>Layout</span>
+        <input type='checkbox' className='Arena-switch' onChange={handleModeSwich} />
+        <span className='Arena-switch_label'>Measure</span>
+      </div>
+      <div className='Arena-measure_editor'>
+        <div>
+          <label htmlFor='robotVelocity'>Robot Velocity</label>
+          <input id='robotVelocity' type='text' placeholder='Meters/Second' 
+                 value={robotVelocity ? robotVelocity.toString() : ''} 
+                 onChange={handleVelocityChange}/>
         </div>
+        <div>
+          <label htmlFor='animationRate'>Animation Rate</label>
+          <input id='animationRate' type='text' placeholder='Steps/Second' 
+                 value={animationRate ? animationRate.toString() : ''} 
+                 onChange={handleAnimRateChange}/>
+        </div>
+        {!isNaN(measureWidth) ? 
+          <div>
+            <label htmlFor='measuredWidth'>Measured Width</label>
+            <input id='measuredWidth' type='text' placeholder='Meters' 
+                   value={realWidth ? realWidth.toString() : ''} 
+                   onChange={handleWidthChange}/>
+          </div> : <></>
+        }
+        {!isNaN(measureHeight) ? 
+          <div>
+            <label htmlFor='measuredHeight'>Measured Height</label>
+            <input id='measuredHeight' type='text' placeholder='Meters' 
+                   value={realHeight ? realHeight.toString() : ''} 
+                   onChange={handleHeightChange}/>
+          </div> : <></>
+        }
       </div>
       <div>
         <button onClick={handleClearClick}>Clear</button>
-        <button>Run</button>
+        <button onClick={handleRunClick} disabled={instrs.length == 0}>{runLabel}</button>
       </div>
       <div className='Arena-locations'>
         <ul>

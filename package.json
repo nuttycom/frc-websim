@@ -1,5 +1,6 @@
 {
   "name": "frc-websim",
+  "homepage": "/websim",
   "version": "0.1.0",
   "private": true,
   "dependencies": {

@@ -8,6 +8,7 @@ const ActionEditor: React.FC<{ action: GameAction, setAction: SetAction }> = (pr
   const pname = props.action.produces.length > 0 ? props.action.produces[0].piece_id : "";
   const cname = props.action.consumes.length > 0 ? props.action.consumes[0].piece_id : "";
   const rewardStr = isNaN(props.action.reward) ? "" : props.action.reward.toString();
+  const durationStr = isNaN(props.action.duration) ? "" : props.action.duration.toString();
   const pqtyStr  = (props.action.produces.length === 0 || isNaN(props.action.produces[0].count)) ? "" : props.action.produces[0].count.toString();
   const cqtyStr  = (props.action.consumes.length === 0 || isNaN(props.action.consumes[0].count)) ? "" : props.action.consumes[0].count.toString();
 
@@ -21,6 +22,11 @@ const ActionEditor: React.FC<{ action: GameAction, setAction: SetAction }> = (pr
   const handleRewardChange = (ev: React.ChangeEvent<HTMLInputElement>) => {
     const reward = parseInt(ev.target.value);
     props.setAction({...props.action, reward: reward});
+  };
+
+  const handleDurationChange = (ev: React.ChangeEvent<HTMLInputElement>) => {
+    const duration = parseInt(ev.target.value);
+    props.setAction({...props.action, duration: duration});
   };
 
   const handleProducedPieceId = (ev: React.ChangeEvent<HTMLInputElement>) => {
@@ -62,7 +68,16 @@ const ActionEditor: React.FC<{ action: GameAction, setAction: SetAction }> = (pr
   return (
     <div className='ActionEditor'>
       <input type='text' value={props.action.action_id} size={10} placeholder='Action ID' onChange={handleNameChange} />
-      <input type='text' value={rewardStr} size={6} placeholder='Reward' onChange={handleRewardChange} />
+      <div className='ActionEditor-action_attrs'>
+        <div>
+          <label>Reward:</label>
+          <input type='text' value={rewardStr} size={7} placeholder='Points' onChange={handleRewardChange} />
+        </div>
+        <div>
+          <label>Duration:</label>
+          <input type='text' value={durationStr} size={7} placeholder='Seconds' onChange={handleDurationChange} />
+        </div>
+      </div>
       <div className='ActionEditor-resources'>
         <div className='ActionEditor-resource'>
           <label>Produces:</label>
