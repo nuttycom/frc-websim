@@ -6,11 +6,6 @@ import LocationEditor from './LocationEditor';
 import './Arena.css';
 import RunEditor from './RunEditor';
 
-export type ArenaLocations = {
-  label_idx: number;
-  locations: Array<Location>;
-};
-
 export const labels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
 const robot = new Image();
@@ -19,12 +14,13 @@ robot.src = robotPng;
 const Arena: React.FC = () => {
   const [robotVelocity, setRobotVelocity] = useState<number>(1);
   const [animationRate, setAnimationRate] = useState<number>(30);
-  const [mode, setMode] = useState<'layout' | 'measure'>('layout');
+  const [mode, setMode] = useState<'layout' | 'measure'>('measure');
   const [measureWidth, setMeasureWidth] = useState<number>(NaN);
   const [realWidth, setRealWidth] = useState<number>(10);
   const [measureHeight, setMeasureHeight] = useState<number>(NaN);
   const [realHeight, setRealHeight] = useState<number>(5);
-  const [locations, setLocations] = useState<ArenaLocations>({ label_idx: 0, locations: [] });
+  const [labelIdx, setLabelIdx] = useState<number>(0);
+  const [locations, setLocations] = useState<Array<Location>>([]);
   const [exclusions, setExclusions] = useState<Array<Exclusion>>([]);
   const [instrs, setInstrs] = useState<Array<Runnable>>([]);
 
@@ -83,11 +79,12 @@ const Arena: React.FC = () => {
       setDragging(false);
     } else {
       const loc = {
-        loc_id: labels.charAt(locations.label_idx),
+        loc_id: labels.charAt(labelIdx),
         position: { x: event.clientX - rect.left, y: event.clientY - rect.top },
         actions: []
       };
-      setLocations((s) => ({ label_idx: s.label_idx + 1, locations: s.locations.concat(loc) }));
+      setLabelIdx((i) => i + 1);
+      setLocations((l) => l.concat(loc));
     }
     setMouseDown(false);
     setDragStart(null);
@@ -97,9 +94,9 @@ const Arena: React.FC = () => {
   const handleModeSwich: ChangeEventHandler = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (running) return;
     if (event.target.checked) {
-      setMode('measure');
-    } else {
       setMode('layout');
+    } else {
+      setMode('measure');
     }
   };
 
@@ -125,7 +122,8 @@ const Arena: React.FC = () => {
 
   const handleClearClick: MouseEventHandler<HTMLButtonElement> = (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
     if (running) return;
-    setLocations({ label_idx: 0, locations: [] });
+    setLabelIdx(0);
+    setLocations([]);
     setExclusions([]);
     setInstrs([]);
   };
@@ -134,11 +132,14 @@ const Arena: React.FC = () => {
     if (running) {
       setRunning(false);
       setRunLabel('Run');
+      animStepsRef.current = [];
     } else {
+      console.log(`x ratio: ${measureWidth}/${realWidth}`);
+      console.log(`y ratio: ${measureHeight}/${realHeight}`);
       animStartRef.current = new Date();
       animStepsRef.current = computeSteps(
         instrs,
-        locations.locations,
+        locations,
         robotVelocity,
         measureWidth / realWidth,
         measureHeight / realHeight,
@@ -151,19 +152,18 @@ const Arena: React.FC = () => {
 
   const updateLocation = (loc: Location | null, i: number) => {
     if (running) return;
-    setLocations((aloc) => {
+    setLocations((locs) => {
       if (loc !== null) {
-        aloc.locations[i] = loc;
+        return locs.map((l, idx) => i === idx ? loc : l);
       } else {
-        aloc.locations.splice(i, 1);
+        return locs.flatMap((l, idx) => i === idx ? [] : [l]);
       }
-      return ({ ...aloc })
     })
   };
 
   const draw = useCallback(() => {
     const drawLocations = (ctx: CanvasRenderingContext2D) => {
-      locations.locations.forEach((loc) => {
+      locations.forEach((loc) => {
         ctx.font = '20px Consolas';
         ctx.fillStyle = 'black';
         ctx.fillText(loc.loc_id, loc.position.x - 8, loc.position.y + 5);
@@ -226,7 +226,7 @@ const Arena: React.FC = () => {
         animateRobot(ctx);
       }
     }
-  }, [locations.locations, mode, dragStart, dragEnd, exclusions, running, animationRate]);
+  }, [locations, mode, dragStart, dragEnd, exclusions, running, animationRate]);
 
   useEffect(() => {
     window.requestAnimationFrame(draw);
@@ -249,9 +249,9 @@ const Arena: React.FC = () => {
         </div>
       </div>
       <div className='Arena-switch_row'>
-        <span className='Arena-switch_label'>Layout</span>
-        <input type='checkbox' className='Arena-switch' onChange={handleModeSwich} />
         <span className='Arena-switch_label'>Measure</span>
+        <input type='checkbox' className='Arena-switch' onChange={handleModeSwich} />
+        <span className='Arena-switch_label'>Layout</span>
       </div>
       <div className='Arena-measure_editor'>
         <div>
@@ -289,7 +289,7 @@ const Arena: React.FC = () => {
       </div>
       <div className='Arena-locations'>
         <ul>
-          {locations.locations.map((loc, i) =>
+          {locations.map((loc, i) =>
             <li key={`location-${i}`}>
               <LocationEditor location={loc} setLocation={(newLoc) => updateLocation(newLoc, i)} />
             </li>
@@ -297,7 +297,7 @@ const Arena: React.FC = () => {
         </ul>
       </div>
       <div className='Arena-run-instructions'>
-        <RunEditor locations={locations.locations} runInstructions={instrs} setRunInstructions={(xs) => setInstrs(xs)} />
+        <RunEditor locations={locations} runInstructions={instrs} setRunInstructions={(xs) => setInstrs(xs)} />
       </div>
     </div>
   )

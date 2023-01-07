@@ -88,11 +88,11 @@ export function computeSteps(
   y_ratio: number, // pixels/meter
   animation_rate: number, // steps/second
 ): Array<Step> {
+  console.log(`robot velocity: ${robot_velocity}`);
+  console.log(`x ratio: ${x_ratio}`);
+  console.log(`y ratio: ${y_ratio}`);
+  console.log(`anim rate: ${animation_rate}`);
   if (!(x_ratio > 0 && y_ratio > 0 && animation_rate > 0 && robot_velocity > 0)) {
-    console.log(`robot velocity: ${robot_velocity}`);
-    console.log(`x ratio: ${x_ratio}`);
-    console.log(`y ratio: ${y_ratio}`);
-    console.log(`anim rate: ${animation_rate}`);
     return [];
   }
 
