@@ -110,11 +110,13 @@ const preloadState: ArenaState = {
       "loc_id": "L",
       "position": { "x": 674, "y": 122 },
       "actions": loading_zone_actions()
-    }, 
+    },
     {
       "loc_id": "M",
       "position": { "x": 241, "y": 263 },
-      "actions": [],
+      "actions": [
+        { "action_id": "pause", "reward": 0, "duration": 1, "produces": [], "consumes": [] }
+      ],
     },
     {
       "loc_id": "N",
@@ -168,6 +170,8 @@ const Arena: React.FC = () => {
   const [running, setRunning] = useState<boolean>(false);
   const [runLabel, setRunLabel] = useState<string>('Run');
   const [showLocEditor, setShowLocEditor] = useState<boolean>(true);
+  const [score, setScore] = useState<number>(0);
+  const [runSeconds, setRunSeconds] = useState<number>(0);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animStartRef = useRef<Date>(new Date());
@@ -315,19 +319,19 @@ const Arena: React.FC = () => {
 
   const loadArenaState = (saved: ArenaState) => {
     if (saved.save_version === save_version) {
-        setMode(saved.mode);
-        setLabelIdx(saved.labelIdx);
-        setLocations(saved.locations);
-        setExclusions(saved.exclusions);
-        setInstrs(saved.instrs);
+      setMode(saved.mode);
+      setLabelIdx(saved.labelIdx);
+      setLocations(saved.locations);
+      setExclusions(saved.exclusions);
+      setInstrs(saved.instrs);
 
-        setRobotVelocity(saved.robotVelocity);
-        setAnimationRate(saved.animationRate);
-        setMeasureWidth(saved.measureWidth);
-        setRealHeight(saved.realHeight);
-        setMeasureHeight(saved.measureHeight);
-        setRealWidth(saved.realWidth);
-      } else {
+      setRobotVelocity(saved.robotVelocity);
+      setAnimationRate(saved.animationRate);
+      setMeasureWidth(saved.measureWidth);
+      setRealHeight(saved.realHeight);
+      setMeasureHeight(saved.measureHeight);
+      setRealWidth(saved.realWidth);
+    } else {
       console.log(`Save version ${saved.save_version} not recognized`);
     }
   };
@@ -355,14 +359,17 @@ const Arena: React.FC = () => {
       console.log(`x ratio: ${measureWidth}/${realWidth / 100}`);
       console.log(`y ratio: ${measureHeight}/${realHeight / 100}`);
       animStartRef.current = new Date();
-      animStepsRef.current = computeSteps(
+      const [steps, stepScore, stepSeconds] = computeSteps(
         instrs,
         locations,
         robotVelocity,
-        measureWidth / realWidth,
-        measureHeight / realHeight,
+        measureWidth / (realWidth / 100),
+        measureHeight / (realHeight / 100),
         animationRate
       );
+      animStepsRef.current = steps;
+      setScore(stepScore);
+      setRunSeconds(stepSeconds);
       setRunning(true);
       setRunLabel('Stop');
     }
@@ -512,6 +519,7 @@ const Arena: React.FC = () => {
         <button onClick={handleSaveClick}>Save</button>
         <button onClick={handleRestoreClick} disabled={localStorage.getItem(save_key) === null}>Restore</button>
       </div>
+      {(score > 0 || runSeconds > 0) ? <div><span>Last Run Score: {score} ({Math.floor(runSeconds)} seconds)</span></div> : <></>}
       <div className='Arena-locations'>
         <button onClick={handleToggleLocEditorClick}>Toggle Location Editor</button>
         <ul style={{ display: showLocEditor ? "block" : "none" }}>

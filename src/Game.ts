@@ -96,10 +96,8 @@ export type Step = {
   award: number
 }
 
-type ElemType = 'node' | 'charge_station';
-
 export function updateFieldState(fieldState: FieldState, loc: Location, action_id: string): FieldState {
-  if (loc.loc_id == 'M') {
+  if (loc.loc_id === 'M') {
     fieldState.blue_station.engaged += 1;
   } else if (fieldState.blue_station.engaged > 0) {
     fieldState.blue_station.engaged -= 1;
@@ -110,8 +108,13 @@ export function updateFieldState(fieldState: FieldState, loc: Location, action_i
 
 export function computeFieldAward(fieldState: FieldState, elapsed_seconds: number): number {
   if (elapsed_seconds > 15 && elapsed_seconds < 18 && fieldState.blue_station.engaged > 0) {
+    fieldState.blue_station.engaged = 0;
     return 12;
+  } else if (elapsed_seconds > 150 && elapsed_seconds < 153 && fieldState.blue_station.engaged > 0) {
+    fieldState.blue_station.engaged = 0;
+    return 10;
   } else {
+    /// compute the 
     return 0;
   }
 };
@@ -124,17 +127,17 @@ export function computeSteps(
   x_ratio: number, // pixels/meter
   y_ratio: number, // pixels/meter
   animation_rate: number, // steps/second
-): Array<Step> {
+): [Array<Step>, number, number] {
   console.log(`robot velocity: ${robot_velocity}`);
   console.log(`x ratio: ${x_ratio}`);
   console.log(`y ratio: ${y_ratio}`);
   console.log(`anim rate: ${animation_rate}`);
   if (!(x_ratio > 0 && y_ratio > 0 && animation_rate > 0 && robot_velocity > 0)) {
-    return [];
+    return [[], 0, 0];
   }
 
   var field_state: FieldState = empty_field();
-  var elapsed_seconds: number;
+  var elapsed_seconds: number = 0;
   var cur_loc: Location;
   const steps: Array<Step> = [];
   const addSteps = (r: Runnable) => {
@@ -202,5 +205,53 @@ export function computeSteps(
     addSteps(instrs[i]);
   }
 
-  return steps;
+  return [steps, scoreSteps(steps, field_state), elapsed_seconds];
+}
+
+function scoreSteps(steps: Array<Step>, field_state: FieldState): number {
+  var total = 0;
+  steps.forEach((s) => {
+    total += s.award;
+  });
+
+  const top_state = [0, 1, 2].flatMap((i) => [
+    field_state.blue_grids[i].top.a !== null,
+    field_state.blue_grids[i].top.b !== null,
+    field_state.blue_grids[i].top.c !== null,
+  ]);
+
+  const mid_state = [0, 1, 2].flatMap((i) => [
+    field_state.blue_grids[i].top.a !== null,
+    field_state.blue_grids[i].top.b !== null,
+    field_state.blue_grids[i].top.c !== null,
+  ]);
+
+  const low_state = [0, 1, 2].flatMap((i) => [
+    field_state.blue_grids[i].top.a !== null,
+    field_state.blue_grids[i].top.b !== null,
+    field_state.blue_grids[i].top.c !== null,
+  ]);
+
+  const score_links = (xs: Array<boolean>) => {
+    var link_score = 0;
+    var link_size = 0;
+    for (var i = 0; i < 9; i++) {
+      if (xs[i]) {
+        link_size += 1;
+        if (link_size === 3) {
+          link_score += 1;
+          link_size = 0;
+        } 
+      } else {
+        link_size = 0;
+      }
+    }
+    return link_score;
+  };
+
+  total += score_links(top_state);
+  total += score_links(mid_state);
+  total += score_links(low_state);
+  
+  return total;
 }

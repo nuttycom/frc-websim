@@ -68,7 +68,7 @@ const RunEditor: React.FC<{
     return (
       <select className={className} onChange={onChange}>
         <option value='placeholder'>(select one)</option>
-        {props.locations.map((loc) => <option key={`opt-loc-${loc.loc_id}`} value={loc.loc_id}>Location {loc.loc_id}</option>)}
+        {props.locations.map((loc) => <option key={`${className}-opt-loc-${loc.loc_id}`} value={loc.loc_id}>Location {loc.loc_id}</option>)}
       </select>
     );
   };
