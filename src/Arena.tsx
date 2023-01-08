@@ -1,7 +1,7 @@
 import React, { useEffect, useCallback, useRef, useState, MouseEventHandler, ChangeEventHandler } from 'react';
 import arena from './arena.png';
 import robotPng from './robot.png';
-import { Exclusion, Position, Location, Runnable, computeSteps, Step, GameAction } from './Game';
+import { Exclusion, Position, Location, Runnable, computeSteps, Step, GameAction, computePath } from './Game';
 import LocationEditor from './LocationEditor';
 import './Arena.css';
 import RunEditor from './RunEditor';
@@ -49,7 +49,7 @@ function loading_zone_actions(): Array<GameAction> {
 const preloadState: ArenaState = {
   "save_version": 1,
   "mode": "measure",
-  "labelIdx": 16,
+  "labelIdx": 17,
   "locations": [
     {
       "loc_id": "A",
@@ -141,7 +141,7 @@ const preloadState: ArenaState = {
   ],
   "exclusions": [],
   "instrs": [],
-  "robotVelocity": 2,
+  "robotVelocity": 3,
   "animationRate": 30,
   "measureWidth": 580,
   "realWidth": 1654,
@@ -155,6 +155,7 @@ const Arena: React.FC = () => {
   const [locations, setLocations] = useState<Array<Location>>([]);
   const [exclusions, setExclusions] = useState<Array<Exclusion>>([]);
   const [instrs, setInstrs] = useState<Array<Runnable>>([]);
+  const [instrTimes, setInstrTimes] = useState<Array<number>>([]);
 
   const [robotVelocity, setRobotVelocity] = useState<number>(2);
   const [animationRate, setAnimationRate] = useState<number>(30);
@@ -484,7 +485,7 @@ const Arena: React.FC = () => {
       </div>
       <div className='Arena-measure_editor'>
         <div>
-          <label htmlFor='robotVelocity'>Robot Velocity</label>
+          <label htmlFor='robotVelocity'>Robot Velocity (m/s)</label>
           <input id='robotVelocity' type='text' placeholder='Meters/Second'
             value={robotVelocity ? robotVelocity.toString() : ''}
             onChange={handleVelocityChange} />
@@ -531,7 +532,20 @@ const Arena: React.FC = () => {
         </ul>
       </div>
       <div className='Arena-run-instructions'>
-        <RunEditor locations={locations} runInstructions={instrs} setRunInstructions={(xs) => setInstrs(xs)} />
+        <RunEditor locations={locations} runInstructions={instrs} runTimes={instrTimes} setRunInstructions={
+          (xs) => {
+            setInstrs(xs);
+            setInstrTimes(
+              computePath(
+                instrs,
+                locations,
+                robotVelocity,
+                measureWidth / (realWidth / 100),
+                measureHeight / (realHeight / 100),
+              ).map((x) => x.run_seconds)
+            );
+          }
+        } />
       </div>
     </div>
   )

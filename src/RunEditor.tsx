@@ -7,6 +7,7 @@ type SetRunInstructions = (instructions: Array<Runnable>) => void;
 const RunEditor: React.FC<{
   locations: Array<Location>,
   runInstructions: Array<Runnable>,
+  runTimes: Array<number>,
   setRunInstructions: SetRunInstructions
 }> = (props) => {
   //const [instrs, setInstrs] = useState<Array<Runnable>>(props.runInstructions);
@@ -46,23 +47,26 @@ const RunEditor: React.FC<{
 
   // Rendering Elements
 
-  const runElems: Array<JSX.Element> = props.runInstructions.map((instr, i) => {
-    const renderRunnable = (r: Runnable) => {
-      if (r.kind === 'start') {
-        return (<span>Start at location "{r.loc_id}"</span>);
-      } else if (r.kind === 'move') {
-        return (<span>Move to location "{r.dest_loc_id}"</span>);
-      } else if (r.kind === 'act') {
-        return (<span>Take action "{r.action_id}"</span>);
-      }
-    };
+  const runElems = () => {
+    return props.runInstructions.map((instr, i) => {
+      const instrSeconds = props.runTimes[i] ? <>({Math.round(props.runTimes[i] * 100) / 100} seconds)</> : <></>;
+      const renderRunnable = (r: Runnable, idx: number) => {
+        if (r.kind === 'start') {
+          return (<span>Start at location "{r.loc_id}"</span>);
+        } else if (r.kind === 'move') {
+          return (<span>Move to location "{r.dest_loc_id}" {instrSeconds}</span>);
+        } else if (r.kind === 'act') {
+          return (<span>Take action "{r.action_id}" {instrSeconds}</span>);
+        }
+      };
 
-    return (
-      <li key={`runnable-${i}`}>
-        {renderRunnable(instr)}
-      </li>
-    );
-  });
+      return (
+        <li key={`runnable-${i}`}>
+          {renderRunnable(instr, i)}
+        </li>
+      );
+    });
+  }
 
   const locationSelect = (className: string, onChange: React.ChangeEventHandler<HTMLSelectElement>) => {
     return (
@@ -109,7 +113,7 @@ const RunEditor: React.FC<{
     return (
       <div className="RunEditor">
         <ul className='RunEditor-actions'>
-          {runElems}
+          {runElems()}
           {addRunnableControl()}
         </ul>
       </div>

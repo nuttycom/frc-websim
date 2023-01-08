@@ -58,7 +58,7 @@ export type Grid = {
 };
 
 function empty_grid(): Grid {
-  return ({top: empty_row(), mid: empty_row(), low: empty_hybrid_row()});
+  return ({ top: empty_row(), mid: empty_row(), low: empty_hybrid_row() });
 }
 
 export type Station = {
@@ -71,22 +71,26 @@ function empty_station(): Station {
 }
 
 export type FieldState = {
-  blue_grids: [Grid, Grid, Grid];
-  blue_station: Station;
-  red_grids: [Grid, Grid, Grid];
-  red_station: Station;
+  blue_grids: [Grid, Grid, Grid],
+  blue_station: Station,
+  red_grids: [Grid, Grid, Grid],
+  red_station: Station,
+  endauto_scored: boolean,
+  endgame_scored: boolean
 };
 
 function empty_field(): FieldState {
-  return({
+  return ({
     blue_grids: [empty_grid(), empty_grid(), empty_grid()],
     blue_station: empty_station(),
     red_grids: [empty_grid(), empty_grid(), empty_grid()],
     red_station: empty_station(),
+    endauto_scored: true,
+    endgame_scored: true
   });
 }
 
-export type Runnable = 
+export type Runnable =
   | { kind: "start", loc_id: string }
   | { kind: "move", dest_loc_id: string }
   | { kind: "act", action_id: string };
@@ -98,7 +102,9 @@ export type Step = {
 
 export function updateFieldState(fieldState: FieldState, loc: Location, action_id: string): FieldState {
   if (loc.loc_id === 'M') {
-    fieldState.blue_station.engaged += 1;
+    if (fieldState.blue_station.engaged === 0) {
+      fieldState.blue_station.engaged += 1;
+    }
   } else if (fieldState.blue_station.engaged > 0) {
     fieldState.blue_station.engaged -= 1;
   }
@@ -107,17 +113,80 @@ export function updateFieldState(fieldState: FieldState, loc: Location, action_i
 }
 
 export function computeFieldAward(fieldState: FieldState, elapsed_seconds: number): number {
-  if (elapsed_seconds > 15 && elapsed_seconds < 18 && fieldState.blue_station.engaged > 0) {
-    fieldState.blue_station.engaged = 0;
+  if (elapsed_seconds > 15 && elapsed_seconds < 18 && !fieldState.endauto_scored) {
+    fieldState.endauto_scored = true;
     return 12;
-  } else if (elapsed_seconds > 150 && elapsed_seconds < 153 && fieldState.blue_station.engaged > 0) {
-    fieldState.blue_station.engaged = 0;
+  } else if (elapsed_seconds > 150 && elapsed_seconds < 153 && !fieldState.endgame_scored) {
+    fieldState.endgame_scored = true;
     return 10;
   } else {
-    /// compute the 
     return 0;
   }
 };
+
+export function computePath(
+  instrs: Array<Runnable>,
+  locations: Array<Location>,
+  //exclusions: Array<Exclusion>,
+  robot_velocity: number, // meters/second
+  x_ratio: number, // pixels/meter
+  y_ratio: number, // pixels/meter
+): Array<{ position: Position, run_seconds: number }> {
+  console.log(`robot velocity: ${robot_velocity}`);
+  console.log(`x ratio: ${x_ratio}`);
+  console.log(`y ratio: ${y_ratio}`);
+  if (!(x_ratio > 0 && y_ratio > 0 && robot_velocity > 0)) {
+    return [];
+  }
+
+  var cur_loc: Location;
+  const steps: Array<{position: Position, run_seconds: number}> = [];
+  const addSteps = (r: Runnable) => {
+    if (r.kind === 'start') {
+      const loc = locations.find((l) => l.loc_id === r.loc_id);
+      if (loc) {
+        cur_loc = loc;
+        steps.push({
+          position: loc.position,
+          run_seconds: 0
+        })
+      }
+    } else if (r.kind === 'move') {
+      const loc = locations.find((l) => l.loc_id === r.dest_loc_id);
+      if (loc) {
+        const dx = loc.position.x - cur_loc.position.x;
+        const dy = loc.position.y - cur_loc.position.y;
+        // Find the number of steps in the path using real-world distance (just
+        // straight-line paths not considering exclusions for now)
+        const path_meters = Math.sqrt(
+          Math.pow(Math.abs(dx) / x_ratio, 2) +
+          Math.pow(Math.abs(dy) / y_ratio, 2)
+        );
+        const path_time_seconds = path_meters / robot_velocity;
+        // add a step to take us to the final position, since we'll have not quite arrived there.
+        steps.push({
+          position: { x: loc.position.x, y: loc.position.y },
+          run_seconds: path_time_seconds,
+        });
+        cur_loc = loc;
+      }
+    } else if (r.kind === 'act') {
+      const act = cur_loc.actions.find((act) => act.action_id === r.action_id);
+      if (act) {
+        steps.push({
+          position: { x: cur_loc.position.x, y: cur_loc.position.y },
+          run_seconds: act.duration,
+        });
+      }
+    }
+  };
+
+  for (var i = 0; i < instrs.length; i++) {
+    addSteps(instrs[i]);
+  }
+
+  return steps;
+}
 
 export function computeSteps(
   instrs: Array<Runnable>,
@@ -241,7 +310,7 @@ function scoreSteps(steps: Array<Step>, field_state: FieldState): number {
         if (link_size === 3) {
           link_score += 1;
           link_size = 0;
-        } 
+        }
       } else {
         link_size = 0;
       }
@@ -252,6 +321,6 @@ function scoreSteps(steps: Array<Step>, field_state: FieldState): number {
   total += score_links(top_state);
   total += score_links(mid_state);
   total += score_links(low_state);
-  
+
   return total;
 }
