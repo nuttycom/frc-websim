@@ -28,67 +28,16 @@ export type Location = {
   actions: Array<GameAction>;
 };
 
-export type ItemId = 'cone' | 'cube';
+export type ArenaLayout = {
+  locations: Array<Location>,
+  exclusions: Array<Exclusion>,
+  instrs: Array<Runnable>,
 
-export type FieldElement<IdT> = {
-  elem_id: IdT,
-  loc_id: string,
-  items: Map<ItemId, number>
+  measureWidth: number,
+  realWidth: number,
+  measureHeight: number,
+  realHeight: number,
 };
-
-type CNode = 'cone' | null;
-type BNode = 'block' | null;
-type HNode = 'cone' | 'block' | null;
-
-export type Row = { a: CNode, b: BNode, c: CNode };
-export type HybridRow = { a: HNode, b: HNode, c: HNode };
-
-function empty_row(): Row {
-  return ({ a: null, b: null, c: null });
-}
-
-function empty_hybrid_row(): Row {
-  return ({ a: null, b: null, c: null });
-}
-
-export type Grid = {
-  top: Row,
-  mid: Row,
-  low: HybridRow,
-};
-
-function empty_grid(): Grid {
-  return ({ top: empty_row(), mid: empty_row(), low: empty_hybrid_row() });
-}
-
-export type Station = {
-  docked: number,
-  engaged: number
-};
-
-function empty_station(): Station {
-  return ({ docked: 0, engaged: 0 });
-}
-
-export type FieldState = {
-  blue_grids: [Grid, Grid, Grid],
-  blue_station: Station,
-  red_grids: [Grid, Grid, Grid],
-  red_station: Station,
-  endauto_scored: boolean,
-  endgame_scored: boolean
-};
-
-function empty_field(): FieldState {
-  return ({
-    blue_grids: [empty_grid(), empty_grid(), empty_grid()],
-    blue_station: empty_station(),
-    red_grids: [empty_grid(), empty_grid(), empty_grid()],
-    red_station: empty_station(),
-    endauto_scored: true,
-    endgame_scored: true
-  });
-}
 
 export type Runnable =
   | { kind: "start", loc_id: string }
@@ -100,29 +49,24 @@ export type Step = {
   award: number
 }
 
-export function updateFieldState(fieldState: FieldState, loc: Location, action_id: string): FieldState {
-  if (loc.loc_id === 'M') {
-    if (fieldState.blue_station.engaged === 0) {
-      fieldState.blue_station.engaged += 1;
-    }
-  } else if (fieldState.blue_station.engaged > 0) {
-    fieldState.blue_station.engaged -= 1;
-  }
+export type Move = {
+  runnable: Runnable, 
+  end_loc: Location,
+  end_position: Position, 
+  run_seconds: number
+};
 
-  return fieldState;
+export interface FieldState {
+  elapsed_seconds: number;
 }
 
-export function computeFieldAward(fieldState: FieldState, elapsed_seconds: number): number {
-  if (elapsed_seconds > 15 && elapsed_seconds < 18 && !fieldState.endauto_scored) {
-    fieldState.endauto_scored = true;
-    return 12;
-  } else if (elapsed_seconds > 150 && elapsed_seconds < 153 && !fieldState.endgame_scored) {
-    fieldState.endgame_scored = true;
-    return 10;
-  } else {
-    return 0;
-  }
-};
+export interface Game<FS> {
+  gameId: string;
+  emptyField(): FS;
+  stepFieldState(field_state: FS, step_seconds: number, end_loc: Location | null): FS;
+  computeFieldAward(fs: FS): number;
+  scoreSteps(field_state: FS, steps: Array<Step>): number;
+}
 
 export function computePath(
   instrs: Array<Runnable>,
@@ -131,7 +75,7 @@ export function computePath(
   robot_velocity: number, // meters/second
   x_ratio: number, // pixels/meter
   y_ratio: number, // pixels/meter
-): Array<{ position: Position, run_seconds: number }> {
+): Array<Move> {
   console.log(`robot velocity: ${robot_velocity}`);
   console.log(`x ratio: ${x_ratio}`);
   console.log(`y ratio: ${y_ratio}`);
@@ -139,56 +83,52 @@ export function computePath(
     return [];
   }
 
-  var cur_loc: Location;
-  const steps: Array<{position: Position, run_seconds: number}> = [];
-  const addSteps = (r: Runnable) => {
+  function addMove(acc: Array<Move>, r: Runnable): Array<Move> {
     if (r.kind === 'start') {
-      const loc = locations.find((l) => l.loc_id === r.loc_id);
-      if (loc) {
-        cur_loc = loc;
-        steps.push({
-          position: loc.position,
-          run_seconds: 0
-        })
-      }
+      const loc = locations.find((l) => l.loc_id === r.loc_id)!;
+      return acc.concat({
+        runnable: r,
+        end_loc: loc,
+        end_position: loc.position,
+        run_seconds: 0
+      });
     } else if (r.kind === 'move') {
-      const loc = locations.find((l) => l.loc_id === r.dest_loc_id);
-      if (loc) {
-        const dx = loc.position.x - cur_loc.position.x;
-        const dy = loc.position.y - cur_loc.position.y;
-        // Find the number of steps in the path using real-world distance (just
-        // straight-line paths not considering exclusions for now)
-        const path_meters = Math.sqrt(
-          Math.pow(Math.abs(dx) / x_ratio, 2) +
-          Math.pow(Math.abs(dy) / y_ratio, 2)
-        );
-        const path_time_seconds = path_meters / robot_velocity;
-        // add a step to take us to the final position, since we'll have not quite arrived there.
-        steps.push({
-          position: { x: loc.position.x, y: loc.position.y },
-          run_seconds: path_time_seconds,
-        });
-        cur_loc = loc;
-      }
+      const cur_loc = acc[acc.length - 1].end_loc;
+      const loc = locations.find((l) => l.loc_id === r.dest_loc_id)!;
+      const dx = loc.position.x - cur_loc.position.x;
+      const dy = loc.position.y - cur_loc.position.y;
+      // Find the number of steps in the path using real-world distance (just
+      // straight-line paths not considering exclusions for now)
+      const path_meters = Math.sqrt(
+        Math.pow(Math.abs(dx) / x_ratio, 2) +
+        Math.pow(Math.abs(dy) / y_ratio, 2)
+      );
+      // add a step to take us to the final position, since we'll have not quite arrived there.
+      return acc.concat({
+        runnable: r,
+        end_loc: loc,
+        end_position: { x: loc.position.x, y: loc.position.y },
+        run_seconds: path_meters / robot_velocity,
+      });
     } else if (r.kind === 'act') {
-      const act = cur_loc.actions.find((act) => act.action_id === r.action_id);
-      if (act) {
-        steps.push({
-          position: { x: cur_loc.position.x, y: cur_loc.position.y },
-          run_seconds: act.duration,
-        });
-      }
+      const cur_loc = acc[acc.length - 1].end_loc;
+      const act = cur_loc.actions.find((act) => act.action_id === r.action_id)!;
+      return acc.concat({
+        runnable: r,
+        end_loc: cur_loc,
+        end_position: { x: cur_loc!.position.x, y: cur_loc!.position.y },
+        run_seconds: act.duration,
+      });
+    } else {
+      return acc;
     }
   };
 
-  for (var i = 0; i < instrs.length; i++) {
-    addSteps(instrs[i]);
-  }
-
-  return steps;
+  return instrs.reduce<Array<Move>>(addMove, []);
 }
 
-export function computeSteps(
+export function computeSteps<FS extends FieldState>(
+  game: Game<FS>,
   instrs: Array<Runnable>,
   locations: Array<Location>,
   //exclusions: Array<Exclusion>,
@@ -205,122 +145,61 @@ export function computeSteps(
     return [[], 0, 0];
   }
 
-  var field_state: FieldState = empty_field();
-  var elapsed_seconds: number = 0;
-  var cur_loc: Location;
-  const steps: Array<Step> = [];
-  const addSteps = (r: Runnable) => {
-    if (r.kind === 'start') {
-      const loc = locations.find((l) => l.loc_id === r.loc_id);
-      if (loc) {
-        cur_loc = loc;
-        steps.push({
-          position: loc.position,
-          award: 0
-        })
-      }
-    } else if (r.kind === 'move') {
-      const loc = locations.find((l) => l.loc_id === r.dest_loc_id);
-      if (loc) {
-        const dx = loc.position.x - cur_loc.position.x;
-        const dy = loc.position.y - cur_loc.position.y;
-        // Find the number of steps in the path using real-world distance (just
-        // straight-line paths not considering exclusions for now)
-        const path_meters = Math.sqrt(
-          Math.pow(Math.abs(dx) / x_ratio, 2) +
-          Math.pow(Math.abs(dy) / y_ratio, 2)
-        );
-        const path_time_seconds = path_meters / robot_velocity;
-        const step_count = path_time_seconds * animation_rate;
-        const step_seconds = path_time_seconds / step_count;
-        const x_step = dx / step_count;
-        const y_step = dy / step_count;
-        for (var mi = 0; mi < step_count; mi++) {
-          elapsed_seconds += step_seconds;
-          steps.push({
-            position: { x: cur_loc.position.x + x_step * mi, y: cur_loc.position.y + y_step * mi },
-            award: computeFieldAward(field_state, elapsed_seconds),
-          });
-        }
-        // add a step to take us to the final position, since we'll have not quite arrived there.
-        steps.push({
-          position: { x: loc.position.x, y: loc.position.y },
-          award: 0,
+  const addSteps = (acc: [FS, Location | null, Array<Step>], m: Move): [FS, Location, Array<Step>] => {
+    var [fs, cur_loc, steps] = acc;
+    const runnable: Runnable = m.runnable;
+    if (runnable.kind === 'start') {
+      return [fs, m.end_loc, steps.concat({
+        position: m.end_position,
+        award: 0
+      })];
+    } else if (runnable.kind === 'move') {
+      const prev_pos = steps[steps.length - 1].position;
+      const step_count = m.run_seconds * animation_rate;
+      const step_seconds = m.run_seconds / step_count;
+
+      const dx = m.end_position.x - prev_pos.x;
+      const dy = m.end_position.y - prev_pos.y;
+      const x_step = dx / step_count;
+      const y_step = dy / step_count;
+
+      var move_steps = [];
+      for (var mi = 0; mi < step_count; mi++) {
+        fs = game.stepFieldState(fs, step_seconds, null);
+        move_steps.push({
+          position: { x: prev_pos.x + x_step * mi, y: prev_pos.y + y_step * mi },
+          award: game.computeFieldAward(fs),
         });
-        cur_loc = loc;
       }
-    } else if (r.kind === 'act') {
-      const act = cur_loc.actions.find((act) => act.action_id === r.action_id);
+      fs = game.stepFieldState(fs, 0, m.end_loc);
+      return [fs, m.end_loc, steps.concat(move_steps)];
+    } else if (runnable.kind === 'act') {
+      const act = cur_loc!.actions.find((act) => act.action_id === runnable.action_id);
+      var act_steps = [];
       if (act) {
         const step_count = act.duration * animation_rate;
         const step_seconds = act.duration / step_count;
         for (var ai = 0; ai < step_count; ai++) {
-          elapsed_seconds += step_seconds;
-          field_state = updateFieldState(field_state, cur_loc, r.action_id);
-          steps.push({
-            position: { x: cur_loc.position.x, y: cur_loc.position.y },
-            award: computeFieldAward(field_state, elapsed_seconds),
+          fs = game.stepFieldState(fs, step_seconds, cur_loc);
+          act_steps.push({
+            position: cur_loc!.position,
+            award: game.computeFieldAward(fs),
           });
         }
-        steps.push({
-          position: { x: cur_loc.position.x, y: cur_loc.position.y },
-          award: act.reward,
-        });
+        fs = game.stepFieldState(fs, 0, m.end_loc);
       }
+      return [fs, m.end_loc, steps.concat(act_steps)];
+    } else {
+      // this should be unreachable
+      return [fs, m.end_loc, steps];
     }
   };
 
-  for (var i = 0; i < instrs.length; i++) {
-    addSteps(instrs[i]);
-  }
-
-  return [steps, scoreSteps(steps, field_state), elapsed_seconds];
-}
-
-function scoreSteps(steps: Array<Step>, field_state: FieldState): number {
-  var total = 0;
-  steps.forEach((s) => {
-    total += s.award;
-  });
-
-  const top_state = [0, 1, 2].flatMap((i) => [
-    field_state.blue_grids[i].top.a !== null,
-    field_state.blue_grids[i].top.b !== null,
-    field_state.blue_grids[i].top.c !== null,
-  ]);
-
-  const mid_state = [0, 1, 2].flatMap((i) => [
-    field_state.blue_grids[i].top.a !== null,
-    field_state.blue_grids[i].top.b !== null,
-    field_state.blue_grids[i].top.c !== null,
-  ]);
-
-  const low_state = [0, 1, 2].flatMap((i) => [
-    field_state.blue_grids[i].top.a !== null,
-    field_state.blue_grids[i].top.b !== null,
-    field_state.blue_grids[i].top.c !== null,
-  ]);
-
-  const score_links = (xs: Array<boolean>) => {
-    var link_score = 0;
-    var link_size = 0;
-    for (var i = 0; i < 9; i++) {
-      if (xs[i]) {
-        link_size += 1;
-        if (link_size === 3) {
-          link_score += 1;
-          link_size = 0;
-        }
-      } else {
-        link_size = 0;
-      }
-    }
-    return link_score;
-  };
-
-  total += score_links(top_state);
-  total += score_links(mid_state);
-  total += score_links(low_state);
-
-  return total;
+  const moves = computePath(instrs, locations, robot_velocity, x_ratio, y_ratio);
+  const [end_fs, , steps] = moves.reduce<[FS, Location | null, Array<Step>]>(
+    addSteps,
+    [game.emptyField(), null, []]
+  )
+  
+  return [steps, game.scoreSteps(end_fs, steps), end_fs.elapsed_seconds];
 }

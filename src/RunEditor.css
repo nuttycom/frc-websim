@@ -26,3 +26,7 @@
   display: inline-block;
   margin-left: 5px;
 }
+
+.runSeconds {
+  text-align: right;
+}

@@ -111,6 +111,10 @@ input[type="checkbox"].Arena-switch:checked:after {
   left: calc(100% - 1.5em);
 }
 
+input[type="text"].robotVelocity-err {
+  background: lightcoral;
+}
+
 .Arena-locations ul {
   list-style: none;
 }

@@ -1,16 +1,17 @@
 import React, { useEffect, useCallback, useRef, useState, MouseEventHandler, ChangeEventHandler } from 'react';
 import arena from './arena.png';
 import robotPng from './robot.png';
-import { Exclusion, Position, Location, Runnable, computeSteps, Step, GameAction, computePath } from './Game';
+import { Exclusion, Position, Location, Runnable, computeSteps, Step, computePath, ArenaLayout, Move } from './Game';
 import LocationEditor from './LocationEditor';
 import './Arena.css';
 import RunEditor from './RunEditor';
+import ChargedUp, { preloadState } from './ChargedUp';
 
 const labels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-const game_id = 'chargedup';
-const save_version = 1;
+const game = new ChargedUp();
+const save_version = 2;
 
-const save_key = `websim-${game_id}-v${save_version}`;
+const save_key = `websim-${game.gameId}-v${save_version}`;
 
 const robot = new Image();
 robot.src = robotPng;
@@ -19,134 +20,10 @@ type ArenaState = {
   save_version: number,
   mode: 'layout' | 'measure',
   labelIdx: number,
-  locations: Array<Location>,
-  exclusions: Array<Exclusion>,
-  instrs: Array<Runnable>,
+  layout: ArenaLayout,
 
   robotVelocity: number,
   animationRate: number,
-  measureWidth: number,
-  realWidth: number,
-  measureHeight: number,
-  realHeight: number,
-};
-
-function grid_col_actions(piece_id: 'cone' | 'block'): Array<GameAction> {
-  return [
-    { "action_id": "place_high", "reward": 6, "duration": 2, "produces": [], "consumes": [{ "piece_id": piece_id, "count": 1 }] },
-    { "action_id": "place_mid", "reward": 4, "duration": 2, "produces": [], "consumes": [{ "piece_id": piece_id, "count": 1 }] },
-    { "action_id": "place_low", "reward": 3, "duration": 1, "produces": [], "consumes": [{ "piece_id": piece_id, "count": 1 }] }
-  ];
-};
-
-function loading_zone_actions(): Array<GameAction> {
-  return [
-    { "action_id": "take_cone", "reward": 0, "duration": 2, "produces": [{ "piece_id": "block", "count": 1 }], "consumes": [] },
-    { "action_id": "take_block", "reward": 0, "duration": 2, "produces": [{ "piece_id": "cone", "count": 1 }], "consumes": [] }
-  ];
-};
-
-const preloadState: ArenaState = {
-  "save_version": 1,
-  "mode": "measure",
-  "labelIdx": 17,
-  "locations": [
-    {
-      "loc_id": "A",
-      "position": { "x": 170, "y": 356 },
-      "actions": grid_col_actions('cone'),
-    },
-    {
-      "loc_id": "B",
-      "position": { "x": 170, "y": 326 },
-      "actions": grid_col_actions('block')
-    },
-    {
-      "loc_id": "C",
-      "position": { "x": 170, "y": 304 },
-      "actions": grid_col_actions('cone'),
-    },
-    {
-      "loc_id": "D",
-      "position": { "x": 170, "y": 284 },
-      "actions": grid_col_actions('cone')
-    },
-    {
-      "loc_id": "E",
-      "position": { "x": 170, "y": 264 },
-      "actions": grid_col_actions('cone')
-    },
-    {
-      "loc_id": "F",
-      "position": { "x": 170, "y": 235 },
-      "actions": grid_col_actions('block')
-    },
-    {
-      "loc_id": "G",
-      "position": { "x": 170, "y": 217 },
-      "actions": grid_col_actions('cone')
-    },
-    {
-      "loc_id": "H",
-      "position": { "x": 170, "y": 194 },
-      "actions": grid_col_actions('cone')
-    },
-    {
-      "loc_id": "I",
-      "position": { "x": 170, "y": 170 },
-      "actions": grid_col_actions('block')
-    },
-    {
-      "loc_id": "J",
-      "position": { "x": 610, "y": 54 },
-      "actions": loading_zone_actions()
-    },
-    {
-      "loc_id": "K",
-      "position": { "x": 672, "y": 75 },
-      "actions": loading_zone_actions()
-    },
-    {
-      "loc_id": "L",
-      "position": { "x": 674, "y": 122 },
-      "actions": loading_zone_actions()
-    },
-    {
-      "loc_id": "M",
-      "position": { "x": 241, "y": 263 },
-      "actions": [
-        { "action_id": "pause", "reward": 0, "duration": 1, "produces": [], "consumes": [] }
-      ],
-    },
-    {
-      "loc_id": "N",
-      "position": { "x": 345, "y": 190 },
-      "actions": loading_zone_actions()
-    },
-    {
-      "loc_id": "O",
-      "position": { "x": 348, "y": 236 },
-      "actions": loading_zone_actions()
-    },
-    {
-      "loc_id": "P",
-      "position": { "x": 345, "y": 285 },
-      "actions": loading_zone_actions()
-    },
-    {
-      "loc_id": "Q",
-      "position": { "x": 349, "y": 336 },
-      "actions": loading_zone_actions()
-    }
-  ],
-  "exclusions": [],
-  "instrs": [],
-  "robotVelocity": 3,
-  "animationRate": 30,
-  "measureWidth": 580,
-  "realWidth": 1654,
-  "measureHeight": 326,
-  "realHeight": 802
 };
 
 const Arena: React.FC = () => {
@@ -155,9 +32,10 @@ const Arena: React.FC = () => {
   const [locations, setLocations] = useState<Array<Location>>([]);
   const [exclusions, setExclusions] = useState<Array<Exclusion>>([]);
   const [instrs, setInstrs] = useState<Array<Runnable>>([]);
-  const [instrTimes, setInstrTimes] = useState<Array<number>>([]);
+  const [moves, setMoves] = useState<Array<Move>>([]);
 
-  const [robotVelocity, setRobotVelocity] = useState<number>(2);
+  const [robotVelocity, setRobotVelocity] = useState<string>("2");
+  const [robotVelocityValid, setRobotVelocityValid] = useState<boolean>(true);
   const [animationRate, setAnimationRate] = useState<number>(30);
   const [measureWidth, setMeasureWidth] = useState<number>(NaN);
   const [realWidth, setRealWidth] = useState<number>(10);
@@ -262,7 +140,9 @@ const Arena: React.FC = () => {
 
   const handleVelocityChange: ChangeEventHandler = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (running) return;
-    setRobotVelocity(parseFloat(event.target.value));
+    setRobotVelocity(event.target.value);
+    console.log(`vel: ${parseFloat(event.target.value)}`);
+    setRobotVelocityValid(!isNaN(parseFloat(event.target.value)));
   };
 
   const handleAnimRateChange: ChangeEventHandler = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -288,7 +168,7 @@ const Arena: React.FC = () => {
     setExclusions([]);
     setInstrs([]);
 
-    setRobotVelocity(2);
+    setRobotVelocity("3");
     setAnimationRate(30);
     setMeasureWidth(NaN);
     setRealHeight(5);
@@ -301,16 +181,18 @@ const Arena: React.FC = () => {
       save_version: save_version,
       mode: mode,
       labelIdx: labelIdx,
-      locations: locations,
-      exclusions: exclusions,
-      instrs: instrs,
+      layout: {
+        locations: locations,
+        exclusions: exclusions,
+        instrs: instrs,
 
+        measureWidth: measureWidth,
+        realWidth: realWidth,
+        measureHeight: measureHeight,
+        realHeight: realHeight
+      },
       robotVelocity: robotVelocity,
       animationRate: animationRate,
-      measureWidth: measureWidth,
-      realWidth: realWidth,
-      measureHeight: measureHeight,
-      realHeight: realHeight
     });
 
     console.log(save_json);
@@ -322,23 +204,30 @@ const Arena: React.FC = () => {
     if (saved.save_version === save_version) {
       setMode(saved.mode);
       setLabelIdx(saved.labelIdx);
-      setLocations(saved.locations);
-      setExclusions(saved.exclusions);
-      setInstrs(saved.instrs);
+      setLocations(saved.layout.locations);
+      setExclusions(saved.layout.exclusions);
+      setInstrs(saved.layout.instrs);
 
-      setRobotVelocity(saved.robotVelocity);
+      setRobotVelocity(saved.robotVelocity.toString());
       setAnimationRate(saved.animationRate);
-      setMeasureWidth(saved.measureWidth);
-      setRealHeight(saved.realHeight);
-      setMeasureHeight(saved.measureHeight);
-      setRealWidth(saved.realWidth);
+      setMeasureWidth(saved.layout.measureWidth);
+      setRealHeight(saved.layout.realHeight);
+      setMeasureHeight(saved.layout.measureHeight);
+      setRealWidth(saved.layout.realWidth);
     } else {
       console.log(`Save version ${saved.save_version} not recognized`);
     }
   };
 
   const handleResetClick: MouseEventHandler<HTMLButtonElement> = (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
-    loadArenaState(preloadState);
+    loadArenaState({
+      save_version: save_version,
+      mode: 'layout',
+      labelIdx: preloadState.locations.length,
+      layout: preloadState,
+      robotVelocity: 3,
+      animationRate: 30
+    });
   };
 
   const handleRestoreClick: MouseEventHandler<HTMLButtonElement> = (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
@@ -356,14 +245,15 @@ const Arena: React.FC = () => {
       setRunning(false);
       setRunLabel('Run');
       animStepsRef.current = [];
-    } else {
+    } else if (!isNaN(parseFloat(robotVelocity))) {
       console.log(`x ratio: ${measureWidth}/${realWidth / 100}`);
       console.log(`y ratio: ${measureHeight}/${realHeight / 100}`);
       animStartRef.current = new Date();
       const [steps, stepScore, stepSeconds] = computeSteps(
+        game,
         instrs,
         locations,
-        robotVelocity,
+        parseFloat(robotVelocity),
         measureWidth / (realWidth / 100),
         measureHeight / (realHeight / 100),
         animationRate
@@ -486,9 +376,12 @@ const Arena: React.FC = () => {
       <div className='Arena-measure_editor'>
         <div>
           <label htmlFor='robotVelocity'>Robot Velocity (m/s)</label>
-          <input id='robotVelocity' type='text' placeholder='Meters/Second'
-            value={robotVelocity ? robotVelocity.toString() : ''}
-            onChange={handleVelocityChange} />
+          <input id='robotVelocity' 
+                 className={robotVelocityValid ? 'robotVelocity': 'robotVelocity-err'} 
+                 type='text' 
+                 placeholder='Meters/Second'
+                 value={robotVelocity}
+                 onChange={handleVelocityChange} />
         </div>
         <div>
           <label htmlFor='animationRate'>Animation Rate</label>
@@ -499,7 +392,7 @@ const Arena: React.FC = () => {
         {!isNaN(measureWidth) ?
           <div>
             <label htmlFor='measuredWidth'>Measured Width</label>
-            <input id='measuredWidth' type='text' placeholder='cm'
+            <input id='measuredWidth' type='text' placeholder='(cm)'
               value={realWidth ? realWidth.toString() : ''}
               onChange={handleWidthChange} />
           </div> : <></>
@@ -507,7 +400,7 @@ const Arena: React.FC = () => {
         {!isNaN(measureHeight) ?
           <div>
             <label htmlFor='measuredHeight'>Measured Height</label>
-            <input id='measuredHeight' type='text' placeholder='cm'
+            <input id='measuredHeight' type='text' placeholder='(cm)'
               value={realHeight ? realHeight.toString() : ''}
               onChange={handleHeightChange} />
           </div> : <></>
@@ -532,18 +425,20 @@ const Arena: React.FC = () => {
         </ul>
       </div>
       <div className='Arena-run-instructions'>
-        <RunEditor locations={locations} runInstructions={instrs} runTimes={instrTimes} setRunInstructions={
-          (xs) => {
-            setInstrs(xs);
-            setInstrTimes(
-              computePath(
-                instrs,
-                locations,
-                robotVelocity,
-                measureWidth / (realWidth / 100),
-                measureHeight / (realHeight / 100),
-              ).map((x) => x.run_seconds)
-            );
+        <RunEditor locations={locations} moves={moves} addRunInstruction={
+          (instr) => {
+            setInstrs((xs) => xs.concat(instr));
+            if (!isNaN(parseFloat(robotVelocity))) {
+              setMoves(
+                computePath(
+                  instrs.concat(instr),
+                  locations,
+                  parseFloat(robotVelocity),
+                  measureWidth / (realWidth / 100),
+                  measureHeight / (realHeight / 100),
+                )
+              );
+            }
           }
         } />
       </div>

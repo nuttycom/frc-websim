@@ -1,14 +1,13 @@
 import React, { useState } from "react";
-import { Location, Runnable } from "./Game";
+import { Location, Runnable, Move } from "./Game";
 import './RunEditor.css';
 
-type SetRunInstructions = (instructions: Array<Runnable>) => void;
+type AddRunInstruction = (instr: Runnable) => void;
 
 const RunEditor: React.FC<{
   locations: Array<Location>,
-  runInstructions: Array<Runnable>,
-  runTimes: Array<number>,
-  setRunInstructions: SetRunInstructions
+  moves: Array<Move>,
+  addRunInstruction: AddRunInstruction
 }> = (props) => {
   //const [instrs, setInstrs] = useState<Array<Runnable>>(props.runInstructions);
   const [runnableType, setRunnableType] = useState<string>('move');
@@ -25,7 +24,7 @@ const RunEditor: React.FC<{
   const setStart = (event: React.ChangeEvent<HTMLSelectElement>) => {
     if (event.target.value !== 'placeholder') {
       setLastLocation(props.locations.find((loc) => loc.loc_id === event.target.value))
-      props.setRunInstructions(props.runInstructions.concat({ kind: 'start', loc_id: event.target.value }));
+      props.addRunInstruction({ kind: 'start', loc_id: event.target.value });
       setRunnableType('move');
     }
   };
@@ -33,14 +32,14 @@ const RunEditor: React.FC<{
   const addMove = (event: React.ChangeEvent<HTMLSelectElement>) => {
     if (event.target.value !== 'placeholder') {
       setLastLocation(props.locations.find((loc) => loc.loc_id === event.target.value))
-      props.setRunInstructions(props.runInstructions.concat({ kind: 'move', dest_loc_id: event.target.value }));
+      props.addRunInstruction({ kind: 'move', dest_loc_id: event.target.value });
       setRunnableType('move');
     }
   };
 
   const addAction = (event: React.ChangeEvent<HTMLSelectElement>) => {
     if (event.target.value !== 'placeholder') {
-      props.setRunInstructions(props.runInstructions.concat({ kind: 'act', action_id: event.target.value }));
+      props.addRunInstruction({ kind: 'act', action_id: event.target.value });
       setRunnableType('move');
     }
   };
@@ -48,21 +47,27 @@ const RunEditor: React.FC<{
   // Rendering Elements
 
   const runElems = () => {
-    return props.runInstructions.map((instr, i) => {
-      const instrSeconds = props.runTimes[i] ? <>({Math.round(props.runTimes[i] * 100) / 100} seconds)</> : <></>;
-      const renderRunnable = (r: Runnable, idx: number) => {
-        if (r.kind === 'start') {
-          return (<span>Start at location "{r.loc_id}"</span>);
-        } else if (r.kind === 'move') {
-          return (<span>Move to location "{r.dest_loc_id}" {instrSeconds}</span>);
-        } else if (r.kind === 'act') {
-          return (<span>Take action "{r.action_id}" {instrSeconds}</span>);
+    return props.moves.map((move, i) => {
+      const renderRunnable = () => {
+        const runnable = move.runnable;
+        if (runnable.kind === 'start') {
+          return (<span>Start at location "{move.end_loc.loc_id}"</span>);
+        } else if (runnable.kind === 'move') {
+          return (<>
+            <span>Move to location "{move.end_loc.loc_id}"</span>
+            <span className='runSeconds'>({Math.round(move.run_seconds * 100) / 100} seconds)</span>
+          </>);
+        } else if (runnable.kind === 'act') {
+          return (<>
+            <span>Take action "{runnable.action_id}"</span>
+            <span className='runSeconds'>({Math.round(move.run_seconds * 100) / 100} seconds)</span>
+          </>);
         }
       };
 
       return (
         <li key={`runnable-${i}`}>
-          {renderRunnable(instr, i)}
+          {renderRunnable()}
         </li>
       );
     });
@@ -89,7 +94,7 @@ const RunEditor: React.FC<{
   };
 
   const addRunnableControl = () => {
-    if (props.runInstructions.length === 0) {
+    if (props.moves.length === 0) {
       return (
         <li key='run-control'>
           <span>Start at</span> {locationSelect('start-select', setStart)}
