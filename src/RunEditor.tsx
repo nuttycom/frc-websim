@@ -2,12 +2,12 @@ import React, { useState } from "react";
 import { Location, Runnable, Move } from "./Game";
 import './RunEditor.css';
 
-type AddRunInstruction = (instr: Runnable) => void;
-
 const RunEditor: React.FC<{
   locations: Array<Location>,
   moves: Array<Move>,
-  addRunInstruction: AddRunInstruction
+  addRunInstruction: (instr: Runnable) => void,
+  deleteRunInstruction: (index: number) => void,
+
 }> = (props) => {
   //const [instrs, setInstrs] = useState<Array<Runnable>>(props.runInstructions);
   const [runnableType, setRunnableType] = useState<string>('move');
@@ -44,6 +44,12 @@ const RunEditor: React.FC<{
     }
   };
 
+  const handleDeleteClick: ((delete_idx: number) => React.MouseEventHandler<HTMLButtonElement>) = (delete_idx: number) => {
+    return (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+      props.deleteRunInstruction(delete_idx)
+    }
+  }
+
   // Rendering Elements
 
   const runElems = () => {
@@ -54,11 +60,13 @@ const RunEditor: React.FC<{
           return (<span>Start at location "{move.end_loc.loc_id}"</span>);
         } else if (runnable.kind === 'move') {
           return (<>
+            <button onClick={handleDeleteClick(i)}>X</button>
             <span>Move to location "{move.end_loc.loc_id}"</span>
             <span className='runSeconds'>({Math.round(move.run_seconds * 100) / 100} seconds)</span>
           </>);
         } else if (runnable.kind === 'act') {
           return (<>
+            <button onClick={handleDeleteClick(i)}>X</button>
             <span>Take action "{runnable.action_id}"</span>
             <span className='runSeconds'>({Math.round(move.run_seconds * 100) / 100} seconds)</span>
           </>);

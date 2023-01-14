@@ -1,7 +1,7 @@
 import React, { useEffect, useCallback, useRef, useState, MouseEventHandler, ChangeEventHandler } from 'react';
 import arena from './arena.png';
 import robotPng from './robot.png';
-import { Exclusion, Position, Location, Runnable, computeSteps, Step, computePath, ArenaLayout, Move } from './Game';
+import { Exclusion, Position, Location, Runnable, computeSteps, Step, computePath, ArenaLayout } from './Game';
 import LocationEditor from './LocationEditor';
 import './Arena.css';
 import RunEditor from './RunEditor';
@@ -32,7 +32,6 @@ const Arena: React.FC = () => {
   const [locations, setLocations] = useState<Array<Location>>([]);
   const [exclusions, setExclusions] = useState<Array<Exclusion>>([]);
   const [instrs, setInstrs] = useState<Array<Runnable>>([]);
-  const [moves, setMoves] = useState<Array<Move>>([]);
 
   const [robotVelocity, setRobotVelocity] = useState<string>("2");
   const [robotVelocityValid, setRobotVelocityValid] = useState<boolean>(true);
@@ -348,6 +347,21 @@ const Arena: React.FC = () => {
     }
   }, [locations, mode, dragStart, dragEnd, exclusions, running, animationRate]);
 
+  const computeMoves = () => {
+    if (!isNaN(parseFloat(robotVelocity))) {
+      console.log(`Recomputing path...`);
+      return computePath(
+        instrs,
+        locations,
+        parseFloat(robotVelocity),
+        measureWidth / (realWidth / 100),
+        measureHeight / (realHeight / 100),
+      );
+    } else {
+      return [];
+    }
+  };
+
   useEffect(() => {
     window.requestAnimationFrame(draw);
   }, [draw]);
@@ -376,12 +390,12 @@ const Arena: React.FC = () => {
       <div className='Arena-measure_editor'>
         <div>
           <label htmlFor='robotVelocity'>Robot Velocity (m/s)</label>
-          <input id='robotVelocity' 
-                 className={robotVelocityValid ? 'robotVelocity': 'robotVelocity-err'} 
-                 type='text' 
-                 placeholder='Meters/Second'
-                 value={robotVelocity}
-                 onChange={handleVelocityChange} />
+          <input id='robotVelocity'
+            className={robotVelocityValid ? 'robotVelocity' : 'robotVelocity-err'}
+            type='text'
+            placeholder='Meters/Second'
+            value={robotVelocity}
+            onChange={handleVelocityChange} />
         </div>
         <div>
           <label htmlFor='animationRate'>Animation Rate</label>
@@ -425,20 +439,24 @@ const Arena: React.FC = () => {
         </ul>
       </div>
       <div className='Arena-run-instructions'>
-        <RunEditor locations={locations} moves={moves} addRunInstruction={
+        <RunEditor locations={locations} moves={computeMoves()} addRunInstruction={
           (instr) => {
             setInstrs((xs) => xs.concat(instr));
-            if (!isNaN(parseFloat(robotVelocity))) {
-              setMoves(
-                computePath(
-                  instrs.concat(instr),
-                  locations,
-                  parseFloat(robotVelocity),
-                  measureWidth / (realWidth / 100),
-                  measureHeight / (realHeight / 100),
-                )
-              );
-            }
+          }
+        } deleteRunInstruction={
+          (delete_idx) => {
+            setInstrs((xs) => {
+              var deleted = xs[delete_idx];
+              var to_delete_end = delete_idx + 1;
+              if (deleted.kind === 'move') {
+                for (var i = delete_idx + 1; i < xs.length; i++) {
+                  if (xs[i].kind === 'act') {
+                    to_delete_end = i + 1;
+                  }
+                }
+              }
+              return xs.filter((v, i) => i < delete_idx || i >= to_delete_end);
+            });
           }
         } />
       </div>
