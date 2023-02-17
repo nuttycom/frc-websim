@@ -1,10 +1,8 @@
 import React, { useEffect, useCallback, useRef, useState, MouseEventHandler, ChangeEventHandler } from 'react';
 import arena from './arena.png';
 import robotPng from './robot.png';
-import { Exclusion, Position, Location, Runnable, computeSteps, Step, computePath, ArenaLayout } from './Game';
-import LocationEditor from './LocationEditor';
+import { Exclusion, Position, Location, Runnable, Step, computePath, ArenaLayout } from './Game';
 import './Arena.css';
-import RunEditor from './RunEditor';
 import ChargedUp, { preloadState } from './ChargedUp';
 
 const labels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -47,7 +45,6 @@ const Arena: React.FC = () => {
   const [dragEnd, setDragEnd] = useState<Position | null>(null);
   const [running, setRunning] = useState<boolean>(false);
   const [runLabel, setRunLabel] = useState<string>('Run');
-  const [showLocEditor, setShowLocEditor] = useState<boolean>(true);
   const [score, setScore] = useState<number>(0);
   const [runSeconds, setRunSeconds] = useState<number>(0);
 
@@ -59,7 +56,7 @@ const Arena: React.FC = () => {
     if (running) return;
     const rect = event.currentTarget.getBoundingClientRect();
     setMouseDown(true);
-    setDragStart({ x: event.clientX - rect.left, y: event.clientY - rect.top });
+    setDragStart({ x: event.clientX - rect.left, y: event.clientY - rect.top, heading: null });
   };
 
   const handleMouseMove: MouseEventHandler<HTMLCanvasElement> = (event: React.MouseEvent<HTMLCanvasElement, MouseEvent>) => {
@@ -67,7 +64,7 @@ const Arena: React.FC = () => {
     const rect = event.currentTarget.getBoundingClientRect();
     if (mouseDown) {
       setDragging(true);
-      setDragEnd({ x: event.clientX - rect.left, y: event.clientY - rect.top })
+      setDragEnd({ x: event.clientX - rect.left, y: event.clientY - rect.top, heading: null })
     }
   };
 
@@ -100,7 +97,8 @@ const Arena: React.FC = () => {
           {
             top_left: {
               x: Math.min(dragStart.x, dragEnd.x),
-              y: Math.min(dragStart.y, dragEnd.y)
+              y: Math.min(dragStart.y, dragEnd.y),
+              heading: null
             },
             width: drag_area.width,
             height: drag_area.height,
@@ -117,7 +115,7 @@ const Arena: React.FC = () => {
     } else {
       const loc = {
         loc_id: labels.charAt(labelIdx),
-        position: { x: event.clientX - rect.left, y: event.clientY - rect.top },
+        position: { x: event.clientX - rect.left, y: event.clientY - rect.top, heading: null },
         actions: []
       };
       setLabelIdx((i) => i + 1);
@@ -237,36 +235,6 @@ const Arena: React.FC = () => {
     } else {
       console.log(`Save format ${save_json} not recognized.`);
     }
-  };
-
-  const handleRunClick: MouseEventHandler<HTMLButtonElement> = (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
-    if (running) {
-      setRunning(false);
-      setRunLabel('Run');
-      animStepsRef.current = [];
-    } else if (!isNaN(parseFloat(robotVelocity))) {
-      console.log(`x ratio: ${measureWidth}/${realWidth / 100}`);
-      console.log(`y ratio: ${measureHeight}/${realHeight / 100}`);
-      animStartRef.current = new Date();
-      const [steps, stepScore, stepSeconds] = computeSteps(
-        game,
-        instrs,
-        locations,
-        parseFloat(robotVelocity),
-        measureWidth / (realWidth / 100),
-        measureHeight / (realHeight / 100),
-        animationRate
-      );
-      animStepsRef.current = steps;
-      setScore(stepScore);
-      setRunSeconds(stepSeconds);
-      setRunning(true);
-      setRunLabel('Stop');
-    }
-  };
-
-  const handleToggleLocEditorClick: MouseEventHandler<HTMLButtonElement> = (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
-    setShowLocEditor((show) => !show);
   };
 
   const updateLocation = (loc: Location | null, i: number) => {
@@ -422,43 +390,19 @@ const Arena: React.FC = () => {
       </div>
       <div>
         <button onClick={handleClearClick}>Clear</button>
-        <button onClick={handleRunClick} disabled={instrs.length === 0}>{runLabel}</button>
         <button onClick={handleResetClick}>Reset</button>
         <button onClick={handleSaveClick}>Save</button>
         <button onClick={handleRestoreClick} disabled={localStorage.getItem(save_key) === null}>Restore</button>
       </div>
       {(score > 0 || runSeconds > 0) ? <div><span>Last Run Score: {score} ({Math.floor(runSeconds)} seconds)</span></div> : <></>}
       <div className='Arena-locations'>
-        <button onClick={handleToggleLocEditorClick}>Toggle Location Editor</button>
-        <ul style={{ display: showLocEditor ? "block" : "none" }}>
+        <ul>
           {locations.map((loc, i) =>
             <li key={`location-${i}`}>
-              <LocationEditor location={loc} setLocation={(newLoc) => updateLocation(newLoc, i)} />
+              <span>{loc.loc_id}</span>
             </li>
           )}
         </ul>
-      </div>
-      <div className='Arena-run-instructions'>
-        <RunEditor locations={locations} moves={computeMoves()} addRunInstruction={
-          (instr) => {
-            setInstrs((xs) => xs.concat(instr));
-          }
-        } deleteRunInstruction={
-          (delete_idx) => {
-            setInstrs((xs) => {
-              var deleted = xs[delete_idx];
-              var to_delete_end = delete_idx + 1;
-              if (deleted.kind === 'move') {
-                for (var i = delete_idx + 1; i < xs.length; i++) {
-                  if (xs[i].kind === 'act') {
-                    to_delete_end = i + 1;
-                  }
-                }
-              }
-              return xs.filter((v, i) => i < delete_idx || i >= to_delete_end);
-            });
-          }
-        } />
       </div>
     </div>
   )
