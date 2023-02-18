@@ -1,66 +1,34 @@
 import React, { useEffect, useCallback, useRef, useState, MouseEventHandler, ChangeEventHandler } from 'react';
 import arena from './arena.png';
 import robotPng from './robot.png';
-import { Exclusion, Position, Location, Runnable, Step, computePath, ArenaLayout } from './Game';
+import { Exclusion, Position, Location } from './Game';
 import './Arena.css';
-import ChargedUp, { preloadState } from './ChargedUp';
 
 const labels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-const game = new ChargedUp();
-const save_version = 2;
-
-const save_key = `websim-${game.gameId}-v${save_version}`;
 
 const robot = new Image();
 robot.src = robotPng;
-
-type ArenaState = {
-  save_version: number,
-  mode: 'layout' | 'measure',
-  labelIdx: number,
-  layout: ArenaLayout,
-
-  robotVelocity: number,
-  animationRate: number,
-};
 
 const Arena: React.FC = () => {
   const [mode, setMode] = useState<'layout' | 'measure'>('measure');
   const [labelIdx, setLabelIdx] = useState<number>(0);
   const [locations, setLocations] = useState<Array<Location>>([]);
   const [exclusions, setExclusions] = useState<Array<Exclusion>>([]);
-  const [instrs, setInstrs] = useState<Array<Runnable>>([]);
-
-  const [robotVelocity, setRobotVelocity] = useState<string>("2");
-  const [robotVelocityValid, setRobotVelocityValid] = useState<boolean>(true);
-  const [animationRate, setAnimationRate] = useState<number>(30);
-  const [measureWidth, setMeasureWidth] = useState<number>(NaN);
-  const [realWidth, setRealWidth] = useState<number>(10);
-  const [measureHeight, setMeasureHeight] = useState<number>(NaN);
-  const [realHeight, setRealHeight] = useState<number>(5);
 
   const [mouseDown, setMouseDown] = useState<boolean>(false);
   const [dragging, setDragging] = useState<boolean>(false);
   const [dragStart, setDragStart] = useState<Position | null>(null);
   const [dragEnd, setDragEnd] = useState<Position | null>(null);
-  const [running, setRunning] = useState<boolean>(false);
-  const [runLabel, setRunLabel] = useState<string>('Run');
-  const [score, setScore] = useState<number>(0);
-  const [runSeconds, setRunSeconds] = useState<number>(0);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animStartRef = useRef<Date>(new Date());
-  const animStepsRef = useRef<Array<Step>>([]);
 
   const handleMouseDown: MouseEventHandler<HTMLCanvasElement> = (event: React.MouseEvent<HTMLCanvasElement, MouseEvent>) => {
-    if (running) return;
     const rect = event.currentTarget.getBoundingClientRect();
     setMouseDown(true);
     setDragStart({ x: event.clientX - rect.left, y: event.clientY - rect.top, heading: null });
   };
 
   const handleMouseMove: MouseEventHandler<HTMLCanvasElement> = (event: React.MouseEvent<HTMLCanvasElement, MouseEvent>) => {
-    if (running) return;
     const rect = event.currentTarget.getBoundingClientRect();
     if (mouseDown) {
       setDragging(true);
@@ -69,7 +37,6 @@ const Arena: React.FC = () => {
   };
 
   const handleMouseUp: MouseEventHandler<HTMLCanvasElement> = (event: React.MouseEvent<HTMLCanvasElement, MouseEvent>) => {
-    if (running) return;
     const rect = event.currentTarget.getBoundingClientRect();
 
     const getDragArea = () => {
@@ -104,12 +71,6 @@ const Arena: React.FC = () => {
             height: drag_area.height,
           }
         ]));
-      } else if (mode === 'measure') {
-        if (drag_area.width > drag_area.height) {
-          setMeasureWidth(drag_area.width);
-        } else {
-          setMeasureHeight(drag_area.height);
-        }
       }
       setDragging(false);
     } else {
@@ -126,126 +87,27 @@ const Arena: React.FC = () => {
     setDragEnd(null);
   };
 
-  const handleModeSwich: ChangeEventHandler = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (running) return;
-    if (event.target.checked) {
-      setMode('layout');
-    } else {
-      setMode('measure');
-    }
-  };
-
-  const handleVelocityChange: ChangeEventHandler = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (running) return;
-    setRobotVelocity(event.target.value);
-    console.log(`vel: ${parseFloat(event.target.value)}`);
-    setRobotVelocityValid(!isNaN(parseFloat(event.target.value)));
-  };
-
-  const handleAnimRateChange: ChangeEventHandler = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (running) return;
-    setAnimationRate(parseInt(event.target.value));
-  };
-
-  const handleHeightChange: ChangeEventHandler = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (running) return;
-    setRealHeight(parseFloat(event.target.value));
-  };
-
-  const handleWidthChange: ChangeEventHandler = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (running) return;
-    setRealWidth(parseFloat(event.target.value));
-  };
-
   const handleClearClick: MouseEventHandler<HTMLButtonElement> = (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
-    if (running) return;
     setMode('measure');
     setLabelIdx(0);
     setLocations([]);
     setExclusions([]);
-    setInstrs([]);
-
-    setRobotVelocity("3");
-    setAnimationRate(30);
-    setMeasureWidth(NaN);
-    setRealHeight(5);
-    setMeasureHeight(NaN);
-    setRealWidth(10);
   };
 
-  const handleSaveClick: MouseEventHandler<HTMLButtonElement> = (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
-    const save_json = JSON.stringify({
-      save_version: save_version,
-      mode: mode,
-      labelIdx: labelIdx,
-      layout: {
-        locations: locations,
-        exclusions: exclusions,
-        instrs: instrs,
-
-        measureWidth: measureWidth,
-        realWidth: realWidth,
-        measureHeight: measureHeight,
-        realHeight: realHeight
-      },
-      robotVelocity: robotVelocity,
-      animationRate: animationRate,
-    });
-
-    console.log(save_json);
-
-    localStorage.setItem(save_key, save_json);
-  };
-
-  const loadArenaState = (saved: ArenaState) => {
-    if (saved.save_version === save_version) {
-      setMode(saved.mode);
-      setLabelIdx(saved.labelIdx);
-      setLocations(saved.layout.locations);
-      setExclusions(saved.layout.exclusions);
-      setInstrs(saved.layout.instrs);
-
-      setRobotVelocity(saved.robotVelocity.toString());
-      setAnimationRate(saved.animationRate);
-      setMeasureWidth(saved.layout.measureWidth);
-      setRealHeight(saved.layout.realHeight);
-      setMeasureHeight(saved.layout.measureHeight);
-      setRealWidth(saved.layout.realWidth);
-    } else {
-      console.log(`Save version ${saved.save_version} not recognized`);
-    }
-  };
-
-  const handleResetClick: MouseEventHandler<HTMLButtonElement> = (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
-    loadArenaState({
-      save_version: save_version,
-      mode: 'layout',
-      labelIdx: preloadState.locations.length,
-      layout: preloadState,
-      robotVelocity: 3,
-      animationRate: 30
-    });
-  };
-
-  const handleRestoreClick: MouseEventHandler<HTMLButtonElement> = (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
-    const save_json = localStorage.getItem(save_key);
-    if (save_json) {
-      const saved = JSON.parse(save_json) as ArenaState;
-      loadArenaState(saved);
-    } else {
-      console.log(`Save format ${save_json} not recognized.`);
-    }
-  };
-
-  const updateLocation = (loc: Location | null, i: number) => {
-    if (running) return;
-    setLocations((locs) => {
-      if (loc !== null) {
-        return locs.map((l, idx) => i === idx ? loc : l);
-      } else {
-        return locs.flatMap((l, idx) => i === idx ? [] : [l]);
+  const headingChangeHandler: (location_idx: number) => ChangeEventHandler = (location_idx) => {
+    return ((event: React.ChangeEvent<HTMLInputElement>) => {
+      let new_heading = parseFloat(event.target.value);
+      if (!isNaN(new_heading) || event.target.value === "") {
+        setLocations(locations.map((loc, i) => i === location_idx ? {
+          loc_id: loc.loc_id,
+          position: {
+            x: loc.position.x,
+            y: loc.position.y,
+            heading: isNaN(new_heading) ? null : new_heading
+          }
+        } : loc ))
       }
-    })
+    });
   };
 
   const draw = useCallback(() => {
@@ -287,21 +149,6 @@ const Arena: React.FC = () => {
       }
     };
 
-    const animateRobot = (ctx: CanvasRenderingContext2D) => {
-      if (!running) return;
-
-      const run_time = (new Date()).getTime() - animStartRef.current.getTime();
-      const step_idx = Math.floor((run_time / 1000) * animationRate);
-      if (step_idx < animStepsRef.current.length) {
-        const step = animStepsRef.current[step_idx];
-        ctx.drawImage(robot, step.position.x - 12, step.position.y - 12, 24, 24);
-        window.requestAnimationFrame(draw);
-      } else {
-        setRunning(false);
-        setRunLabel('Run');
-      }
-    };
-
     const canvas = canvasRef.current;
     if (canvas != null) {
       const ctx = canvas.getContext('2d');
@@ -310,25 +157,9 @@ const Arena: React.FC = () => {
         drawLocations(ctx);
         drawExclusions(ctx);
         drawDragState(ctx);
-        animateRobot(ctx);
       }
     }
-  }, [locations, mode, dragStart, dragEnd, exclusions, running, animationRate]);
-
-  const computeMoves = () => {
-    if (!isNaN(parseFloat(robotVelocity))) {
-      console.log(`Recomputing path...`);
-      return computePath(
-        instrs,
-        locations,
-        parseFloat(robotVelocity),
-        measureWidth / (realWidth / 100),
-        measureHeight / (realHeight / 100),
-      );
-    } else {
-      return [];
-    }
-  };
+  }, [locations, mode, dragStart, dragEnd, exclusions]);
 
   useEffect(() => {
     window.requestAnimationFrame(draw);
@@ -350,56 +181,20 @@ const Arena: React.FC = () => {
           ></canvas>
         </div>
       </div>
-      <div className='Arena-switch_row'>
-        <span className='Arena-switch_label'>Measure</span>
-        <input type='checkbox' className='Arena-switch' onChange={handleModeSwich} />
-        <span className='Arena-switch_label'>Layout</span>
-      </div>
-      <div className='Arena-measure_editor'>
-        <div>
-          <label htmlFor='robotVelocity'>Robot Velocity (m/s)</label>
-          <input id='robotVelocity'
-            className={robotVelocityValid ? 'robotVelocity' : 'robotVelocity-err'}
-            type='text'
-            placeholder='Meters/Second'
-            value={robotVelocity}
-            onChange={handleVelocityChange} />
-        </div>
-        <div>
-          <label htmlFor='animationRate'>Animation Rate</label>
-          <input id='animationRate' type='text' placeholder='Steps/Second'
-            value={animationRate ? animationRate.toString() : ''}
-            onChange={handleAnimRateChange} />
-        </div>
-        {!isNaN(measureWidth) ?
-          <div>
-            <label htmlFor='measuredWidth'>Measured Width</label>
-            <input id='measuredWidth' type='text' placeholder='(cm)'
-              value={realWidth ? realWidth.toString() : ''}
-              onChange={handleWidthChange} />
-          </div> : <></>
-        }
-        {!isNaN(measureHeight) ?
-          <div>
-            <label htmlFor='measuredHeight'>Measured Height</label>
-            <input id='measuredHeight' type='text' placeholder='(cm)'
-              value={realHeight ? realHeight.toString() : ''}
-              onChange={handleHeightChange} />
-          </div> : <></>
-        }
-      </div>
       <div>
         <button onClick={handleClearClick}>Clear</button>
-        <button onClick={handleResetClick}>Reset</button>
-        <button onClick={handleSaveClick}>Save</button>
-        <button onClick={handleRestoreClick} disabled={localStorage.getItem(save_key) === null}>Restore</button>
       </div>
-      {(score > 0 || runSeconds > 0) ? <div><span>Last Run Score: {score} ({Math.floor(runSeconds)} seconds)</span></div> : <></>}
       <div className='Arena-locations'>
         <ul>
           {locations.map((loc, i) =>
-            <li key={`location-${i}`}>
-              <span>{loc.loc_id}</span>
+            <li key={`location-${loc.loc_id}`}>
+              <span>{loc.loc_id}: x: {loc.position.x}, y: {loc.position.y}, heading: <input 
+                id={`location-heading-${i}`}
+                type='text'
+                value={loc.position.heading !== null ? loc.position.heading : ""}
+                onChange={headingChangeHandler(i)}
+                ></input>
+              </span>
             </li>
           )}
         </ul>

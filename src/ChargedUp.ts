@@ -141,21 +141,6 @@ export default class ChargedUp implements Game<CUFieldState> {
   }
 }
 
-function grid_col_actions(piece_id: 'cone' | 'block'): Array<GameAction> {
-  return [
-    { "action_id": "place_high", "reward": 5, "duration": 2, "produces": [], "consumes": [{ "piece_id": piece_id, "count": 1 }] },
-    { "action_id": "place_mid", "reward": 4, "duration": 2, "produces": [], "consumes": [{ "piece_id": piece_id, "count": 1 }] },
-    { "action_id": "place_low", "reward": 3, "duration": 1, "produces": [], "consumes": [{ "piece_id": piece_id, "count": 1 }] }
-  ];
-};
-
-function loading_zone_actions(): Array<GameAction> {
-  return [
-    { "action_id": "take_cone", "reward": 0, "duration": 2, "produces": [{ "piece_id": "block", "count": 1 }], "consumes": [] },
-    { "action_id": "take_block", "reward": 0, "duration": 2, "produces": [{ "piece_id": "cone", "count": 1 }], "consumes": [] }
-  ];
-};
-
 export const preloadState: ArenaLayout = {
   "locations": [],
   "exclusions": [],
